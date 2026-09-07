@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import {
   Tabs,
   TabList,
@@ -15,16 +16,22 @@ import { ThemedView } from './themed-view';
 
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 
+// expo-router's typed-route generator emits either `/starter` or
+// `/starter/index` for this screen depending on which CLI command regenerated
+// the types; both resolve to the same route at runtime. Pinned here so a
+// regeneration cannot break the build. Web-only file — the product targets iOS.
+const STARTER_HOME = '/starter' as Href;
+
 export default function AppTabs() {
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
-          <TabTrigger name="home" href="/" asChild>
+          <TabTrigger name="home" href={STARTER_HOME} asChild>
             <TabButton>Home</TabButton>
           </TabTrigger>
-          <TabTrigger name="explore" href="/explore" asChild>
+          <TabTrigger name="explore" href="/starter/explore" asChild>
             <TabButton>Explore</TabButton>
           </TabTrigger>
         </CustomTabList>
