@@ -162,6 +162,8 @@ export function compose(input: CompositionInput): CompositionResult {
   return {
     ok: true,
     manifest: {
+      // Composition does not persist; whoever stores it fills this in.
+      id: null,
       transitionKey: input.transitionKey,
       // What was actually composed, which can be under the request when every
       // phase is already at its ceiling. Reporting the request would be a lie.

@@ -20,6 +20,7 @@ import type {
  */
 
 const manifest = (segments: ManifestSegment[], durationSeconds?: number): SessionManifest => ({
+  id: null,
   transitionKey: 'nervous_ready',
   durationSeconds: durationSeconds ?? segments
     .filter((s) => s.layer === 'foreground')

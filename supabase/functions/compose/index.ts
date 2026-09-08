@@ -40,6 +40,7 @@ import type {
   ManifestSegment,
   ModuleFamily,
   RecipePhase,
+  SessionManifest,
 } from "../_shared/types.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -122,6 +123,73 @@ function toWire(segment: ManifestSegment): Record<string, unknown> {
 
   // Generated speech carries no path yet; no provider is wired.
   return base;
+}
+
+/**
+ * Records what was composed.
+ *
+ * ONLY FOR A SIGNED-IN PERSON. This endpoint is callable by anyone holding the
+ * public key, so persisting every anonymous call would let a stranger write
+ * unbounded rows. It also would not buy anything: the point of storing a
+ * manifest is to join it to a run and an outcome, and those only exist for
+ * someone signed in.
+ *
+ * BEST-EFFORT, ALWAYS. A failure here returns null and the session proceeds
+ * without a manifest id. Bookkeeping must never cost somebody their session,
+ * and the gap stays visible in the data as a run with no manifest rather than
+ * being hidden.
+ *
+ * If the segments fail to insert, the manifest row is removed again. A
+ * manifest with no segments is not a smaller record, it is a false one.
+ */
+async function persistManifest(
+  admin: ReturnType<typeof createClient>,
+  userId: string | null,
+  manifest: SessionManifest,
+): Promise<string | null> {
+  if (!userId) return null;
+
+  try {
+    const { data, error } = await admin
+      .from("session_manifests")
+      .insert({
+        user_id: userId,
+        transition_key: manifest.transitionKey,
+        duration_seconds: manifest.durationSeconds,
+        recipe_version: manifest.recipeVersion,
+        dynamic_seconds: manifest.dynamicSeconds,
+      })
+      .select("id")
+      .single();
+
+    if (error || !data) return null;
+    const manifestId = data.id as string;
+
+    const rows = manifest.segments.map((segment) => ({
+      manifest_id: manifestId,
+      ordinal: segment.ordinal,
+      kind: segment.kind,
+      module_id: segment.kind === "module" ? segment.moduleId : null,
+      // Generated speech needs its `generated_segments` row first. Nothing
+      // produces speech yet; if it ever arrives without one, the table's own
+      // check constraint rejects the write and this rolls back rather than
+      // storing a segment that points at nothing.
+      generated_id: null,
+      layer: segment.layer,
+      offset_seconds: segment.offsetSeconds,
+      duration_seconds: segment.durationSeconds,
+    }));
+
+    const { error: segmentError } = await admin.from("manifest_segments").insert(rows);
+    if (segmentError) {
+      await admin.from("session_manifests").delete().eq("id", manifestId);
+      return null;
+    }
+
+    return manifestId;
+  } catch {
+    return null;
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -253,10 +321,12 @@ Deno.serve(async (req: Request) => {
   if (!result.ok) return fail(result.failure);
 
   const { manifest } = result;
+  const manifestId = await persistManifest(admin, userId, manifest);
 
   return json({
     ok: true,
     manifest: {
+      manifest_id: manifestId,
       transition_key: manifest.transitionKey,
       // What was actually composed, which can be under the request when every
       // phase is at its ceiling. Reporting the request would be a lie.

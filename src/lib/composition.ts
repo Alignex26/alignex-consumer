@@ -41,6 +41,7 @@ type WireResponse =
   | {
       ok: true;
       manifest: {
+        manifest_id: string | null;
         transition_key: string;
         duration_seconds: number;
         recipe_version: number;
@@ -131,6 +132,7 @@ export async function loadComposition(
     }
 
     const manifest: SessionManifest = {
+      id: data.manifest.manifest_id ?? null,
       transitionKey: data.manifest.transition_key as TransitionKey,
       durationSeconds: data.manifest.duration_seconds,
       recipeVersion: data.manifest.recipe_version,

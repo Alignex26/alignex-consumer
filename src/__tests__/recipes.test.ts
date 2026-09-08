@@ -343,3 +343,55 @@ describe('the edge functions import only names that exist', () => {
     }
   });
 });
+
+describe('manifest persistence', () => {
+  const FUNCTION = join(
+    __dirname, '..', '..', 'supabase', 'functions', 'compose', 'index.ts'
+  );
+  const source = readFileSync(FUNCTION, 'utf8');
+
+  it('records a manifest only for a signed-in person', () => {
+    // The endpoint is callable by anyone holding the public key, so persisting
+    // every anonymous call would let a stranger write unbounded rows. It would
+    // also buy nothing: a stored manifest exists to be joined to a run and an
+    // outcome, and neither exists for someone signed out.
+    expect(source).toContain('if (!userId) return null;');
+  });
+
+  it('removes the manifest if its segments fail to insert', () => {
+    // A manifest with no segments is not a smaller record, it is a false one.
+    expect(source).toContain('await admin.from("session_manifests").delete().eq("id", manifestId);');
+  });
+
+  it('never lets a failed write break the session', () => {
+    // Bookkeeping must not cost somebody their session. Every failure path in
+    // the persist helper returns null, and the gap stays visible in the data
+    // as a run with no manifest rather than being hidden.
+    const helper = source.slice(
+      source.indexOf('async function persistManifest'),
+      source.indexOf('Deno.serve')
+    );
+    expect(helper).toContain('catch {');
+    expect(helper).not.toContain('throw');
+  });
+
+  it('keeps the join to runs intact', () => {
+    // session_costs -> session_manifests -> user_sessions -> session_outcomes
+    const runs = readFileSync(join(__dirname, '..', 'lib', 'runs.ts'), 'utf8');
+    expect(runs).toContain('manifest_id: manifestId');
+
+    const screen = readFileSync(join(__dirname, '..', 'app', 'session.tsx'), 'utf8');
+    expect(screen).toContain('composition.manifest?.id ?? null');
+  });
+
+  it('does not create the run until the composer has answered', () => {
+    // Otherwise the run is written the moment an interpretation exists, with a
+    // null manifest id, even when a manifest was on its way.
+    const screen = readFileSync(join(__dirname, '..', 'app', 'session.tsx'), 'utf8');
+    const effect = screen.slice(
+      screen.indexOf('// ---- Create the run, once'),
+      screen.indexOf('createdRun.current = true;')
+    );
+    expect(effect).toContain('if (composition.loading) return;');
+  });
+});

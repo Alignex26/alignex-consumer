@@ -109,10 +109,20 @@ export default function SessionScreen() {
 
   // ---- Create the run, once ----------------------------------------------
   useEffect(() => {
+    // Wait for the composition attempt to settle. Without this the run is
+    // created the moment an interpretation exists — before the composer has
+    // answered — and would record `manifest_id: null` even when a manifest
+    // was on its way, quietly breaking the cost-per-outcome join.
+    if (composition.loading) return;
     if (!ready || createdRun.current || !selectedSession || !interpretation) return;
     createdRun.current = true;
 
-    void startRun(selectedSession, interpretation, userId).then((created) => {
+    void startRun(
+      selectedSession,
+      interpretation,
+      userId,
+      composition.manifest?.id ?? null
+    ).then((created) => {
       setRun(created);
       track({
         name: 'session_started',
@@ -121,7 +131,7 @@ export default function SessionScreen() {
         origin: interpretation.origin,
       });
     });
-  }, [ready, selectedSession, interpretation, userId, setRun]);
+  }, [ready, selectedSession, interpretation, userId, setRun, composition.manifest, composition.loading]);
 
   // ---- Start playing once there is something to play ----------------------
   const started = useRef(false);

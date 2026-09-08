@@ -21,7 +21,7 @@ Last updated: 2026-09-08.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 118 passing across 7 suites |
+| Tests | 123 passing across 7 suites |
 | TypeScript | clean |
 | Lint | 1 pre-existing error in `src/hooks/use-color-scheme.web.ts` (Expo starter, web-only, untouched) |
 | Migrations | 7 written, **all applied** |
@@ -346,9 +346,15 @@ Stated plainly so none is mistaken for finished work.
   "Deployed Functions." A test now resolves every relative named import in the
   functions tree against the target's real exports, which catches that class of
   error, but it is not a typechecker. Deno type errors still reach production.
-- **Manifests are not persisted.** `session_manifests` is unused and
-  `user_sessions.manifest_id` stays null, so cost per successful transition is
-  reachable by join but has no data.
+- **Manifest persistence is written and deployed but has never run.** The
+  composer records a manifest and links it to the run, completing
+  `session_costs -> session_manifests -> user_sessions -> session_outcomes`.
+  The code sits downstream of a successful composition, which needs approved
+  modules, so with an empty library it is unreachable and untested in
+  execution. It will first run when real modules land, and should be watched
+  the first time it does.
+- **Nothing writes `session_costs` yet.** The manifest link exists; the cost
+  row does not. That needs the generation path, which needs a TTS provider.
 - **No TTS provider, and no dynamic speech.** Sessions bill nothing. This gates
   only the small dynamic-speech layer — recipes, modules, manifests,
   effectiveness and static audio all progress without it.

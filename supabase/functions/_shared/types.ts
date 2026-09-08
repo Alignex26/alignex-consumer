@@ -133,6 +133,14 @@ export type ManifestSegment =
  * property of this shape, not a policy someone has to remember.
  */
 export type SessionManifest = {
+  /**
+   * The persisted row, when there is one.
+   *
+   * Null for anyone signed out, and null when the write failed. A session
+   * must never fail because bookkeeping did, so the gap shows up as a run
+   * with no manifest rather than as a person losing their session.
+   */
+  id: string | null;
   transitionKey: string;
   durationSeconds: number;
   recipeVersion: number;

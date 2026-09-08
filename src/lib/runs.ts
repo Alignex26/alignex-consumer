@@ -80,7 +80,16 @@ export function isPersisted(run: SessionRun): boolean {
 export async function startRun(
   session: CatalogueSession,
   interpretation: Interpretation,
-  userId: string | null
+  userId: string | null,
+  /**
+   * The composed manifest this run played, when there was one.
+   *
+   * Null on the catalogue path, and null whenever the manifest could not be
+   * persisted. That is the link cost-per-successful-transition is joined on:
+   *   session_costs -> session_manifests -> user_sessions -> session_outcomes
+   * A run without it is still a valid run; it simply cannot be costed.
+   */
+  manifestId: string | null = null
 ): Promise<SessionRun> {
   const supabase = getSupabase();
   if (!supabase || !userId) return localRun(session, interpretation.transitionKey);
@@ -97,6 +106,7 @@ export async function startRun(
         state_target: interpretation.stateTarget,
         context_tag: interpretation.contextTag,
         origin: interpretation.origin,
+        manifest_id: manifestId,
         status: 'started',
         completed: false,
       })
