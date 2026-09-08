@@ -321,6 +321,15 @@ Probed, not assumed:
 - **The composer behaves.** `library_empty` for a valid transition with no
   modules, `bad_duration` for 99999 seconds, `unknown_transition` for an
   unknown or absent key.
+- **The whole flow was walked on a device**, welcome through to the outcome
+  question. The session screen logged
+  `[ELSEA] Session engine unavailable (library_empty)` — which is the chain
+  proving itself end to end: the app called the deployed composer, the composer
+  read the seeded recipes with the service role, found no modules, and the app
+  fell back to the catalogue path and ran a correctly timed silent session.
+  Pause was verified by holding the clock at 0:37 across five seconds rather
+  than by assuming. Availability gating showed correctly: from `tired_wired`
+  the only target offered was Sleep, and only "Rested" was enabled.
 
 ---
 
@@ -348,7 +357,6 @@ Stated plainly so none is mistaken for finished work.
   Real crossfade needs composition to model the overlap.
 - **`FADE_SECONDS`, `BED_GAIN`, `BED_GAIN_DUCKED` are engineering defaults**,
   not approved production values.
-- **The session screen is unproven at runtime** since the composer was wired.
 - **`assets/images/elsea-transition-hero.png`** is committed but unreferenced.
 - **Cost retention is undecided.** Cost rows cascade from the user, so deleting
   an account erases its cost history.
@@ -359,6 +367,20 @@ Stated plainly so none is mistaken for finished work.
 
 The architecture phase is **closed**. Migrations applied, composer deployed,
 lockdown verified.
+
+**Two product questions the device walk surfaced.** Neither is a defect;
+both are decisions.
+
+1. A state pill alone routes to the correction screen rather than into a
+   session, because a shortcut is not an interpretation. Correct by design, but
+   it costs two extra taps on what is likely the most common quick path.
+2. Availability gating is strict: someone arriving `tired_wired` sees one
+   enabled target and five dimmed cards. Right per the taxonomy; whether five
+   dimmed cards is the right presentation is a design call.
+
+Also outstanding and purely cosmetic: the target and time screen still shows
+"STATE TRANSITION INTELLIGENCE", which the entry redesign removed from Screens
+1 and 2 but which was out of scope for that work.
 
 **The real work now: the intervention-module library.** Nothing composes until
 approved modules exist. A small, exceptional set beats hundreds of mediocre
