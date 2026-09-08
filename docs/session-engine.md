@@ -152,12 +152,21 @@ These are properties of the system, enforced in code and covered by tests.
 Stated plainly so it is not mistaken for finished work.
 
 - **No audio content exists.** The library is a schema with no rows.
-- **No multi-segment player.** `use-session-audio.ts` creates a single
-  `useAudioPlayer` and plays only the first segment. Layers, offsets, beds,
-  crossfades and silence are modelled in the manifest but not yet rendered.
-  Rule 6 is specified here, not implemented.
+- **The multi-segment player exists but nothing drives it yet.**
+  `src/audio/use-manifest-player.ts` sequences cues across two alternating
+  players, runs the bed underneath, ducks it under speech, plays composed
+  silence and reports phase progress. It is not wired into `session.tsx`,
+  because `compose()` cannot produce a manifest until `recipe_phases` and
+  `intervention_modules` have rows. The old single-segment
+  `use-session-audio.ts` still serves the live catalogue path.
+- **Edge fades, not crossfades.** Cues ramp in and out inside their own
+  duration. A true crossfade overlaps neighbours, which would make playback
+  finish earlier than the composed duration and drift out of step with the
+  progress bar. A real crossfade requires composition to model the overlap —
+  a manifest change, not a player change.
 - **No TTS provider is wired.** `src/lib/voice` defines the adapter boundary
   and the budget; no vendor is called and no key is bundled client-side.
-- **`sessions_catalogue` remains the live path** behind
-  `SESSION_ENGINE_ENABLED`, because retiring it before the library has content
-  would leave no playable session at all.
+- **`sessions_catalogue` remains the live path**, because retiring it before
+  the library has content would leave no playable session at all. There is no
+  feature flag: a flag would gate a path that cannot yet produce a manifest.
+  The switch happens when recipes and modules land.

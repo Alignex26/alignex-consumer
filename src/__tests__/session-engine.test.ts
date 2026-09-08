@@ -247,6 +247,59 @@ describe('Rule 8 — personalisation is effectiveness data', () => {
   });
 });
 
+describe('phase allocation respects the recipe', () => {
+  it('never runs a phase past its maximum, however long the session', () => {
+    // Regression. Slack was dealt out proportionally but not clamped to each
+    // phase's headroom, so a long session pushed its whole surplus into the
+    // first phase: a regulation phase approved for at most 180s ran for 290s.
+    // Once the floors are clinical rather than provisional, that is a phase
+    // structure being silently overridden by an arithmetic bug.
+    const phases = [phase(0, 'regulation', 60, 180), phase(1, 'reframe', 60, 180)];
+
+    for (const durationSeconds of [200, 300, 600, 1200, 3600]) {
+      const result = compose(
+        baseInput({
+          durationSeconds,
+          phases,
+          modulesByPhase: {
+            regulation: [module_({ id: 'r1', durationSeconds: 30 })],
+            reframe: [module_({ id: 'c1', durationSeconds: 30 })],
+          },
+        })
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('unreachable');
+
+      for (const p of phases) {
+        const allocated = result.manifest.segments
+          .filter((seg) => seg.kind !== 'generated' && seg.phase === p.phase)
+          .reduce((sum, seg) => sum + seg.durationSeconds, 0);
+
+        expect(allocated).toBeGreaterThanOrEqual(p.minSeconds);
+        expect(allocated).toBeLessThanOrEqual(p.maxSeconds);
+      }
+    }
+  });
+
+  it('comes up short rather than overrunning when every phase is at its ceiling', () => {
+    const result = compose(
+      baseInput({
+        durationSeconds: 3600,
+        phases: [phase(0, 'regulation', 60, 180), phase(1, 'reframe', 60, 180)],
+        modulesByPhase: {
+          regulation: [module_({ id: 'r1', durationSeconds: 30 })],
+          reframe: [module_({ id: 'c1', durationSeconds: 30 })],
+        },
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('unreachable');
+    expect(result.manifest.durationSeconds).toBe(360);
+  });
+});
+
 describe('profitability guardrails hold structurally', () => {
   it('speaks nothing at all unless speech was explicitly supplied', () => {
     // "Unrestricted dynamic narration impossible by default". The engine has

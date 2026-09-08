@@ -73,17 +73,25 @@ function allocate(
 
   if (totalHeadroom === 0 || slack === 0) return floors;
 
+  const slackTotal = slack;
   const allocated = floors.slice();
+
   for (let i = 0; i < phases.length && slack > 0; i += 1) {
-    // The last phase takes the remainder so rounding cannot lose a second.
-    const share =
-      i === phases.length - 1
-        ? Math.min(slack, headroom[i])
-        : Math.min(slack, Math.round((headroom[i] / totalHeadroom) * (available - totalFloor)));
+    // Every share is clamped to the phase's own headroom. Without that clamp a
+    // long session pushes its whole surplus into the first phase and runs it
+    // past `maxSeconds` — a regulation phase approved for at most three
+    // minutes silently running five. The last phase mops up the rounding, but
+    // it is clamped too.
+    const proportional = Math.round((headroom[i] / totalHeadroom) * slackTotal);
+    const share = Math.min(slack, headroom[i], i === phases.length - 1 ? slack : proportional);
+
     allocated[i] += share;
     slack -= share;
   }
 
+  // Any surplus left once every phase is at its ceiling is simply not
+  // allocated: the session comes out shorter than asked for, and
+  // `durationSeconds` on the manifest reports what was actually composed.
   return allocated;
 }
 
