@@ -18,11 +18,22 @@ import type { SpeechContext, SpeechRequest, SpeechSlot } from './types.ts';
  * trim would hide the drift that the ceiling exists to catch.
  */
 
+/**
+ * Rule 4, as named constants.
+ *
+ * These were in `allocate.ts` while `DynamicBudget` was here, so the budget
+ * was described in two places. The Edge Function then imported
+ * `BUDGET_NORMAL_SECONDS` from this file, where it did not exist, and Deno
+ * refused to boot. One home for it now.
+ */
+export const BUDGET_NORMAL_SECONDS = 30;
+export const BUDGET_CEILING_SECONDS = 45;
+
 export const DynamicBudget = {
   /** Rule 4. A normal session. */
-  normalSeconds: 30,
+  normalSeconds: BUDGET_NORMAL_SECONDS,
   /** Rule 4. Hard ceiling; an exceptional session may reach this and no further. */
-  ceilingSeconds: 45,
+  ceilingSeconds: BUDGET_CEILING_SECONDS,
   /**
    * Characters per second of calm, guided delivery.
    *

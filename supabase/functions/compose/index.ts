@@ -30,14 +30,17 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // implementation, not two. Deno needs the explicit extension; the app resolves
 // the identical file without one. Keep that module dependency-free or this
 // sharing breaks and the duplication comes back.
-import {
-  BUDGET_CEILING_SECONDS,
-  BUDGET_NORMAL_SECONDS,
-  planPhases,
-  scoresFrom,
-  type PlanModule,
-  type PlanPhase,
-} from "../_shared/allocate.ts";
+// THE SAME composer the tests exercise. Calling `planPhases` directly and
+// assembling the manifest here would leave the bed, the ordinals and the
+// manifest wrapper duplicated — tests green, production subtly different.
+import { compose } from "../_shared/compose.ts";
+import { BUDGET_NORMAL_SECONDS } from "../_shared/speech.ts";
+import type {
+  InterventionModule,
+  ManifestSegment,
+  ModuleFamily,
+  RecipePhase,
+} from "../_shared/types.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -59,8 +62,11 @@ type ModuleRow = {
   id: string;
   module_key: string;
   family: string;
+  technique_key: string;
   storage_path: string;
   duration_seconds: number;
+  intensity: number;
+  requires_headphones: boolean;
   is_bed: boolean;
 };
 
@@ -79,12 +85,44 @@ function fail(failure: string): Response {
   return json({ ok: false, failure });
 }
 
-const toPlanModule = (row: ModuleRow): PlanModule => ({
+const toModule = (row: ModuleRow): InterventionModule => ({
   id: row.id,
   moduleKey: row.module_key,
+  family: row.family as ModuleFamily,
+  techniqueKey: row.technique_key,
   storagePath: row.storage_path,
   durationSeconds: row.duration_seconds,
+  intensity: row.intensity,
+  requiresHeadphones: row.requires_headphones,
+  isBed: row.is_bed,
 });
+
+/** Domain manifest -> wire. The only thing this function does that the
+ *  shared composer does not, because the wire shape is snake_case. */
+function toWire(segment: ManifestSegment): Record<string, unknown> {
+  const base = {
+    kind: segment.kind,
+    ordinal: segment.ordinal,
+    layer: segment.layer,
+    offset_seconds: segment.offsetSeconds,
+    duration_seconds: segment.durationSeconds,
+  };
+
+  if (segment.kind === "module") {
+    return {
+      ...base,
+      module_id: segment.moduleId,
+      module_key: segment.moduleKey,
+      storage_path: segment.storagePath,
+      phase: segment.phase,
+    };
+  }
+
+  if (segment.kind === "silence") return { ...base, phase: segment.phase };
+
+  // Generated speech carries no path yet; no provider is wired.
+  return base;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ ok: false, failure: "method_not_allowed" }, 405);
@@ -134,10 +172,14 @@ Deno.serve(async (req: Request) => {
   const rows = (phaseRows ?? []) as PhaseRow[];
   if (rows.length === 0) return fail("no_recipe");
 
-  const phases: PlanPhase[] = rows.map((r) => ({
+  const phases: RecipePhase[] = rows.map((r) => ({
+    transitionKey: transitionKey,
+    ordinal: r.ordinal,
     phase: r.phase,
     minSeconds: r.min_seconds,
     maxSeconds: r.max_seconds,
+    // Provisional until clinical review (S14); carried, never assumed.
+    isProvisional: true,
   }));
 
   const { data: familyRows } = await admin
@@ -155,7 +197,9 @@ Deno.serve(async (req: Request) => {
   // ---- The library --------------------------------------------------------
   const { data: moduleRows } = await admin
     .from("intervention_modules")
-    .select("id, module_key, family, storage_path, duration_seconds, is_bed")
+    .select(
+      "id, module_key, family, technique_key, storage_path, duration_seconds, intensity, requires_headphones, is_bed",
+    )
     .eq("is_active", true)
     .eq("approved", true);
 
@@ -163,91 +207,64 @@ Deno.serve(async (req: Request) => {
   if (modules.length === 0) return fail("library_empty");
 
   // ---- This person's history ---------------------------------------------
-  let scores = new Map<string, number>();
+  let effectiveness: { moduleId: string; positive: number; total: number }[] = [];
   if (userId) {
     const { data } = await admin
       .from("module_effectiveness")
       .select("module_id, positive, total")
       .eq("user_id", userId);
 
-    scores = scoresFrom(
-      (data ?? []).map((r) => ({ moduleId: r.module_id, positive: r.positive, total: r.total })),
-    );
+    effectiveness = (data ?? []).map((r) => ({
+      moduleId: r.module_id,
+      positive: r.positive,
+      total: r.total,
+    }));
   }
-
-  // ---- Budget -------------------------------------------------------------
-  //
-  // Nothing about the budget comes from the caller. Dynamic speech is not
-  // generated yet, so this session speaks nothing and bills nothing — which is
-  // also the guardrail: narration must be impossible by default.
-  const dynamicSeconds = 0;
-  if (dynamicSeconds > BUDGET_CEILING_SECONDS) return fail("budget_exceeded");
 
   // ---- Compose ------------------------------------------------------------
   //
+  // Nothing about the budget comes from the caller, and no speech is requested:
+  // no provider is wired, so a session speaks nothing and bills nothing. That
+  // is also the guardrail — narration must be impossible by default.
+  //
   // A module qualifies on FAMILY ELIGIBILITY, never on merely existing. A phase
-  // with no approved families accepts nothing and the composition fails, which
-  // is correct: better no session than an unapproved one.
-  const plan = planPhases(
+  // whose families match nothing approved cannot be filled and the composition
+  // fails, which is correct: better no session than an unapproved one.
+  const library = modules.map(toModule);
+  const modulesByPhase: Record<string, InterventionModule[]> = {};
+
+  for (const phase of phases) {
+    const eligible = familiesByPhase.get(phase.phase) ?? [];
+    modulesByPhase[phase.phase] = library.filter(
+      (m) => !m.isBed && eligible.includes(m.family),
+    );
+  }
+
+  const result = compose({
+    transitionKey,
+    durationSeconds,
     phases,
-    (phase) => {
-      const eligible = familiesByPhase.get(phase) ?? [];
-      return modules
-        .filter((m) => !m.is_bed && eligible.includes(m.family))
-        .map(toPlanModule);
-    },
-    scores,
-    durationSeconds - dynamicSeconds,
-  );
-
-  if (!plan.ok) return fail(plan.failure);
-
-  const segments = plan.segments.map((segment, index) => {
-    const base = {
-      ordinal: index,
-      layer: "foreground",
-      offset_seconds: segment.offsetSeconds,
-      duration_seconds: segment.durationSeconds,
-      phase: segment.phase,
-    };
-
-    return segment.kind === "module" && segment.module
-      ? {
-        ...base,
-        kind: "module",
-        module_id: segment.module.id,
-        module_key: segment.module.moduleKey,
-        storage_path: segment.module.storagePath,
-      }
-      : { ...base, kind: "silence" };
+    modulesByPhase,
+    bed: library.find((m) => m.isBed) ?? null,
+    effectiveness,
+    speech: [],
   });
 
-  const bed = modules.find((m) => m.is_bed) ?? null;
-  if (bed) {
-    segments.push({
-      kind: "module",
-      ordinal: 0,
-      layer: "bed",
-      offset_seconds: 0,
-      duration_seconds: plan.totalSeconds,
-      module_id: bed.id,
-      module_key: bed.module_key,
-      storage_path: bed.storage_path,
-      phase: "bed",
-    });
-  }
+  if (!result.ok) return fail(result.failure);
+
+  const { manifest } = result;
 
   return json({
     ok: true,
     manifest: {
-      transition_key: transitionKey,
+      transition_key: manifest.transitionKey,
       // What was actually composed, which can be under the request when every
       // phase is at its ceiling. Reporting the request would be a lie.
-      duration_seconds: plan.totalSeconds,
-      recipe_version: 1,
-      dynamic_seconds: dynamicSeconds,
-      exceptional_speech: dynamicSeconds > BUDGET_NORMAL_SECONDS,
-      segments,
+      duration_seconds: manifest.durationSeconds,
+      recipe_version: manifest.recipeVersion,
+      dynamic_seconds: manifest.dynamicSeconds,
+      exceptional_speech: manifest.dynamicSeconds > BUDGET_NORMAL_SECONDS,
+      segments: manifest.segments.map(toWire),
     },
   });
 });

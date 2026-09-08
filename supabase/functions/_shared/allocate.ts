@@ -24,9 +24,7 @@ export const MIN_SAMPLE = 3;
 /** An unrated module is neither preferred nor penalised. */
 export const NEUTRAL_SCORE = 0.5;
 
-/** Rule 4. Normal, and the hard ceiling. */
-export const BUDGET_NORMAL_SECONDS = 30;
-export const BUDGET_CEILING_SECONDS = 45;
+// The speech budget lives in `speech.ts`, with the rest of the speech code.
 
 // The family vocabulary lives in `types.ts`, which owns the domain types.
 export { MODULE_FAMILIES, type ModuleFamily } from './types.ts';

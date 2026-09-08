@@ -283,3 +283,63 @@ describe('the proprietary tables stay off the client', () => {
     expect(composition).toContain("'compose'");
   });
 });
+
+describe('the edge functions import only names that exist', () => {
+  // WHY THIS EXISTS. `tsconfig.json` excludes `supabase/`, and nothing under
+  // `src/` imports an Edge Function, so tsc never typechecks one. A named
+  // import that does not exist is therefore invisible until Deno refuses to
+  // boot the deployed function — which is exactly what happened:
+  // `compose/index.ts` imported `BUDGET_NORMAL_SECONDS` from `speech.ts`,
+  // where it did not exist, and the deploy succeeded while the function
+  // returned BOOT_ERROR to every caller.
+  //
+  // This resolves every relative import in the functions tree against the
+  // exports of the file it names. It is not a typechecker, but it catches the
+  // one class of error that reaches production silently.
+  const FUNCTIONS = join(__dirname, '..', '..', 'supabase', 'functions');
+
+  const sourcesIn = (dir: string): string[] => {
+    const found: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) found.push(...sourcesIn(path));
+      else if (entry.name.endsWith('.ts')) found.push(path);
+    }
+    return found;
+  };
+
+  const NAMED_IMPORT = /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*['"](\.[^'"]*)['"]/g;
+  const EXPORTED = /export\s+(?:const|function|type|class|interface|enum)\s+(\w+)/g;
+  const RE_EXPORTED = /export\s*\{([^}]*)\}/g;
+
+  it('resolves every named import to a real export', () => {
+    for (const file of sourcesIn(FUNCTIONS)) {
+      const source = readFileSync(file, 'utf8');
+
+      for (const match of source.matchAll(NAMED_IMPORT)) {
+        const names = match[1]
+          .split(',')
+          .map((n) => n.replace(/\btype\b/, '').trim().split(/\s+as\s+/)[0].trim())
+          .filter(Boolean);
+
+        const target = join(file, '..', match[2]);
+        const targetSource = readFileSync(target, 'utf8');
+
+        const exported = new Set<string>();
+        for (const e of targetSource.matchAll(EXPORTED)) exported.add(e[1]);
+        for (const e of targetSource.matchAll(RE_EXPORTED)) {
+          for (const n of e[1].split(',')) {
+            const clean = n.replace(/\btype\b/, '').trim().split(/\s+as\s+/).pop();
+            if (clean) exported.add(clean.trim());
+          }
+        }
+
+        for (const name of names) {
+          expect(`${match[2]} exports ${name}: ${exported.has(name)}`).toBe(
+            `${match[2]} exports ${name}: true`
+          );
+        }
+      }
+    }
+  });
+});
