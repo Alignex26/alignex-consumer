@@ -21,11 +21,11 @@ Last updated: 2026-09-08.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 116 passing across 7 suites |
+| Tests | 118 passing across 7 suites |
 | TypeScript | clean |
 | Lint | 1 pre-existing error in `src/hooks/use-color-scheme.web.ts` (Expo starter, web-only, untouched) |
-| Migrations | 7 written, **5 applied**, 2 pending |
-| Edge functions | `interpret` deployed; `compose` **written, not deployed** |
+| Migrations | 7 written, **all applied** |
+| Edge functions | `interpret` and `compose` both **deployed** |
 | Audio content | **none exists** |
 | Blocking | the intervention-module library |
 
@@ -206,7 +206,7 @@ Moving the confirm step cannot quietly open a path around the gate.
 | `supabase/functions/_shared/compose.ts` | Decision to manifest. **Server-side only.** |
 | `supabase/functions/_shared/speech.ts` | TTS budget and derived cache keys. **Server-side only.** |
 | `supabase/functions/_shared/provider.ts` | Provider adapter boundary. No vendor wired. |
-| `supabase/functions/compose` | **The server-side composer.** Not deployed. |
+| `supabase/functions/compose` | **The server-side composer.** Deployed. Calls `_shared/compose.ts`; it does not assemble manifests itself. |
 | `src/lib/composition.ts` | Transport to the composer. No product logic. |
 | `src/lib/composition.ts` | Calls the composer. Transport only, no product logic. |
 | `src/lib/cost/rate-card.ts` | Versioned rates. No price in code. |
@@ -227,7 +227,7 @@ composer takes over **only when it returns a complete manifest**. Today it
 never does, because no modules exist, so every session falls back. It switches
 over on its own when approved content lands.
 
-### Database — 7 migrations, 5 applied
+### Database — 7 migrations, all applied
 
 | Migration | Applied |
 |---|---|
@@ -236,8 +236,8 @@ over on its own when approved content lands.
 | `20260907090000_core_schema` | yes |
 | `20260908120000_session_engine` | yes |
 | `20260908130000_session_cost_telemetry` | yes |
-| `20260908150000_protect_recipes_and_seed_p19` | **no — pending** |
-| `20260908160000_drop_module_affinities` | **no — pending** |
+| `20260908150000_protect_recipes_and_seed_p19` | yes |
+| `20260908160000_drop_module_affinities` | yes |
 
 Catalogue era: `transitions`, `sessions_catalogue`, `session_segments`,
 `safety_events`, `user_sessions`, `session_outcomes`.
@@ -255,9 +255,7 @@ Cost: `provider_pricing` (append-only, trigger-enforced), `session_costs`.
 `manifest_segments`. Anon-readable: `transitions`, `sessions_catalogue`,
 `session_segments` — no IP, and they serve the live catalogue path.
 
-> The recipe lockdown lands with the pending migration. Until it is applied
-> those tables still carry their anon read policies. Nothing is exposed today
-> because they are empty; applying it before seeding is what closes the window.
+> The lockdown is live and verified — see §6.
 
 ### The five recipes (P19, provisional)
 
@@ -307,15 +305,22 @@ Probed, not assumed:
   passed unchanged across the refactor, which is the parity evidence — same
   inputs, same manifests, one implementation.
 
-Still to verify, once the two pending migrations are applied and `compose` is
-deployed:
+- **The recipe lockdown is live.** Against the deployed database, anon reading
+  `recipe_phases` gets `200 []` while the table holds 31 rows, and
+  `recipe_phase_families` the same against 53. RLS is hiding real data, not an
+  empty table — which is a far stronger result than probing empty tables was.
+  `module_affinities` returns `404 PGRST205`; it is gone.
 
-- that `recipe_phases`, `recipe_phase_families` and `intervention_modules`
-  return nothing to anon;
-- that the Deno bundler resolves the shared allocator. It cannot be checked
-  here — no `deno` binary and no Docker, so `supabase functions serve` will not
-  run. It fails loudly at deploy rather than silently, so deploying `compose`
-  while the library is still empty is a free test of the real boundary.
+  The rows are proven present by `compose` itself: it answers `library_empty`,
+  a failure reached only AFTER the recipe lookup succeeds. Had the recipes been
+  missing it would have said `no_recipe`.
+- **Deno resolves the shared engine.** The deploy uploads
+  `_shared/compose.ts`, `allocate.ts`, `speech.ts` and `types.ts` alongside the
+  function, following the import chain. This could not be checked locally —
+  no `deno` binary, no Docker — and the deploy settled it.
+- **The composer behaves.** `library_empty` for a valid transition with no
+  modules, `bad_duration` for 99999 seconds, `unknown_transition` for an
+  unknown or absent key.
 
 ---
 
@@ -325,15 +330,13 @@ Stated plainly so none is mistaken for finished work.
 
 - **No audio content.** `intervention_modules` is empty. Every session runs
   silent, which the UI states.
-- **Both pending migrations are unapplied and `compose` is not deployed**, so
-  the recipes are not yet live and the lockdown is not yet in force.
-- **The Deno side of the shared allocator is unverified locally.** The app
-  side is proven — tsc, jest and a real Metro bundle all resolve
-  `supabase/functions/_shared/allocate.ts`. The Edge Function imports the same
-  file by plain relative path with the extension Deno requires, from the
-  directory the Supabase CLI already treats as shared code, but there is no
-  local `deno` and no Docker, so `functions serve` cannot run here. The deploy
-  will prove it.
+- **Edge Functions are not typechecked.** `tsconfig.json` excludes `supabase/`
+  and nothing under `src/` imports a function, so tsc never sees one. This is
+  not theoretical: an import of a name that did not exist deployed
+  successfully and returned BOOT_ERROR to every caller, and the CLI still said
+  "Deployed Functions." A test now resolves every relative named import in the
+  functions tree against the target's real exports, which catches that class of
+  error, but it is not a typechecker. Deno type errors still reach production.
 - **Manifests are not persisted.** `session_manifests` is unused and
   `user_sessions.manifest_id` stays null, so cost per successful transition is
   reachable by join but has no data.
@@ -354,12 +357,10 @@ Stated plainly so none is mistaken for finished work.
 
 ## 8. What is needed next, and from whom
 
-**Apply and deploy**, in this order: migration `20260908150000`, then
-`20260908160000`, then `npx supabase functions deploy compose`. Then verify
-anon cannot read `recipe_phases`, `recipe_phase_families` or
-`intervention_modules`.
+The architecture phase is **closed**. Migrations applied, composer deployed,
+lockdown verified.
 
-**Then the real work: the intervention-module library.** Nothing composes until
+**The real work now: the intervention-module library.** Nothing composes until
 approved modules exist. A small, exceptional set beats hundreds of mediocre
 ones. This is content and clinical work, not architecture — and it is where the
 experience the person actually hears gets made.
