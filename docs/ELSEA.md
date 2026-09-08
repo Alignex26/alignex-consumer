@@ -8,10 +8,17 @@ are to where they need to be.
 decided, or found to be wrong. A stale claim here is worse than no claim, so
 prefer deleting a line to leaving it out of date.
 
-Companions: [`session-engine.md`](./session-engine.md) is the architecture of
-record for composition, cost and playback; [`module-library.md`](./module-library.md)
-is the brief for the intervention library. This file is the inventory and the
-state of play.
+Companions:
+
+- [`session-engine.md`](./session-engine.md) — architecture of record for
+  composition, cost and playback.
+- [`module-library.md`](./module-library.md) — constraints the intervention
+  library has to satisfy, computed from the allocator.
+- [`tranche-nervous-ready.md`](./tranche-nervous-ready.md) and
+  [`tranche-wound-up-home.md`](./tranche-wound-up-home.md) — the content briefs
+  for the first two recipes, written for an author who does not read code.
+
+This file is the inventory and the state of play.
 
 Last updated: 2026-09-08.
 
@@ -350,6 +357,21 @@ Stated plainly so none is mistaken for finished work.
   "Deployed Functions." A test now resolves every relative named import in the
   functions tree against the target's real exports, which catches that class of
   error, but it is not a typechecker. Deno type errors still reach production.
+- **A module can repeat across phases within one session.** `fillPhase` builds
+  its no-repeat set per call, so the rule is per-PHASE only: a module eligible
+  in two phases can be selected in both. The documented no-repeat rule reads
+  narrower than the behaviour.
+
+  It is not hypothetical and not rare. With the minimum inventory,
+  `wound_up_home` produces 6 module segments at 300s and 7 at longer durations
+  from 5 distinct modules, because three of its families span two phases each.
+  `nervous_ready` does the same once, via `prepare`.
+
+  **PRODUCT DECISION REQUIRED.** Whether a person may hear the same technique
+  twice in one session, and whether adjacency makes it worse. Not a defect and
+  deliberately unchanged — it is a content judgement with an engineering
+  consequence, and changing it is S16 territory.
+
 - **Nothing verifies that deployed functions match the repository.**
   `supabase migration list` reports migration drift; there is no equivalent for
   Edge Functions. `supabase functions deploy` reports success without saying
