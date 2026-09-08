@@ -350,6 +350,30 @@ Stated plainly so none is mistaken for finished work.
   "Deployed Functions." A test now resolves every relative named import in the
   functions tree against the target's real exports, which catches that class of
   error, but it is not a typechecker. Deno type errors still reach production.
+- **Nothing verifies that deployed functions match the repository.**
+  `supabase migration list` reports migration drift; there is no equivalent for
+  Edge Functions. `supabase functions deploy` reports success without saying
+  what it replaced, and a function can sit live for days behind `main`.
+
+  This is not theoretical. `_shared/allocate.ts` changed by 74 lines when phase
+  chaining landed and was not redeployed for three commits; the live composer
+  was still padding phases with silence while every figure in
+  `module-library.md` described chaining. It happened to be harmless because an
+  empty library short-circuits before the allocator runs — had modules landed
+  first, live behaviour would have silently disagreed with every measurement in
+  that document.
+
+  Until something automates it, check before claiming parity:
+
+  ```bash
+  git log --oneline <last-deploy-commit>..HEAD -- supabase/functions/
+  ```
+
+  An empty result means the deployment is current. Anything else means
+  redeploy. Worth noting the trap: comparing the working tree to `main` proves
+  nothing about what is deployed, and reads like a parity check while being
+  entirely silent about it.
+
 - **Manifest persistence is written and deployed but has never run.** The
   composer records a manifest and links it to the run, completing
   `session_costs -> session_manifests -> user_sessions -> session_outcomes`.
@@ -426,6 +450,9 @@ Notes for whoever picks this up:
 - **React Compiler is enabled.** Do not read refs during render, and do not
   mutate values returned by hooks. Both are lint errors, and both are real.
 - **Never edit an applied migration.** Add a new one.
+- **Redeploy after touching `supabase/functions/`, including `_shared/`.**
+  A change to shared code is a change to every function that imports it, and
+  nothing will tell you the deployed copy is stale.
 - **The allocator has one home:** `supabase/functions/_shared/allocate.ts`.
   Keep it dependency-free — no React, Expo, Supabase client, Deno or Node
   globals — or the app and the Edge Function can no longer share it.
