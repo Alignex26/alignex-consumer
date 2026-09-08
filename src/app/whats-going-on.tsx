@@ -12,36 +12,75 @@ import {
 import Animated, { FadeIn, FadeInDown, useReducedMotion } from 'react-native-reanimated';
 
 import { ElseaBackButton } from '@/components/elsea/elsea-back-button';
-import { ElseaConversationField } from '@/components/elsea/elsea-conversation-field';
 import { ElseaHeading } from '@/components/elsea/elsea-heading';
 import { ElseaPrimaryAction } from '@/components/elsea/elsea-primary-action';
-import { ElseaShortcutChip } from '@/components/elsea/elsea-shortcut-chip';
-import { ElseaSituationInput } from '@/components/elsea/elsea-situation-input';
+import { ElseaQuietField } from '@/components/elsea/elsea-quiet-field';
+import { ElseaSituationInput, SITUATION_EXAMPLE } from '@/components/elsea/elsea-situation-input';
+import { ElseaStatePill } from '@/components/elsea/elsea-state-pill';
+import { ElseaWordmark } from '@/components/elsea/elsea-wordmark';
 import {
   ELSEA_SHORTCUTS,
+  ElseaEntryS2,
+  ElseaEntryS2Color,
+  ElseaEntryS2Head,
   ElseaFontScaleCap,
   ElseaMotion,
   ElseaS02,
-  ElseaS02Color,
   ElseaS02Metric,
+  ElseaSize,
+  ElseaWelcome,
+  ElseaWelcomeColor,
+  ElseaWelcomeType,
 } from '@/constants/elsea';
 import { useElseaLayout } from '@/layout/use-elsea-layout';
-import { track } from '@/lib/analytics';
 import { useKeyboardHeight } from '@/layout/use-keyboard-height';
+import { track } from '@/lib/analytics';
 import { navigateTo } from '@/navigation/elsea-routes';
 import { hasMeaningfulText, useSessionDraft } from '@/state/session-draft';
 
-const C = ElseaS02Color;
+const C = ElseaEntryS2Color;
+const S = ElseaEntryS2;
+
+/** The one non-canonical control in the grid. Display copy only. */
+const MORE = 'More';
+
+/**
+ * The nine choices, laid out as three rows of three.
+ *
+ * Chunked here rather than by wrapping, because a wrapping row cannot
+ * guarantee three equal columns: it breaks on measured text width, so
+ * "Overwhelmed" and "Low" end up on rows of different lengths. Explicit rows
+ * of `flex: 1` pills give the specified grid on every width.
+ *
+ * The eight canonical shortcuts are unchanged and still carry the selection
+ * behaviour; `More` is appended as display copy and remains inert.
+ */
+const PILL_ROWS: string[][] = (() => {
+  const all: string[] = [...ELSEA_SHORTCUTS, MORE];
+  const rows: string[][] = [];
+  for (let i = 0; i < all.length; i += S.pillColumns) {
+    rows.push(all.slice(i, i + S.pillColumns));
+  }
+  return rows;
+})();
 
 /**
  * SCREEN 02 — WHAT'S GOING ON?
  *
  * Where the person says what is actually happening. Free text is primary; the
- * shortcut chips are an optional way in for someone who cannot find the words.
+ * state pills are an optional way in for someone who cannot find the words.
+ *
+ * Screen 1 is the brand moment; this is the interface, and it is deliberately
+ * quieter — a small wordmark rather than a large one, no orb, and only two
+ * things on the screen that light up: the pill you have chosen and Continue.
  *
  * Everything is in normal layout flow. Nothing below the heading is positioned
  * by coordinate, which is what lets the heading take a second line on a narrow
  * screen and simply push the rest of the screen down.
+ *
+ * Behaviour is untouched: both routes in are kept, neither clears the other,
+ * nothing is interpreted here, and Continue goes to the screen that runs the
+ * server-side safety gate.
  */
 export default function WhatsGoingOnScreen() {
   const { insets, widthClass, isCompact, horizontalGutter, contentMaxWidth } = useElseaLayout();
@@ -51,6 +90,8 @@ export default function WhatsGoingOnScreen() {
   const { situationText, setSituationText, shortcut, setShortcut } = useSessionDraft();
 
   const m = ElseaS02Metric[widthClass];
+  const head = ElseaEntryS2Head[widthClass];
+  const cta = ElseaWelcomeType[widthClass];
 
   // Either route in is enough. Neither clears the other: someone can tap a
   // state and then write, or write and then tap, and both are kept.
@@ -112,7 +153,7 @@ export default function WhatsGoingOnScreen() {
 
   return (
     <View style={styles.root}>
-      <ElseaConversationField />
+      <ElseaQuietField />
       <StatusBar style="light" />
 
       <KeyboardAvoidingView
@@ -130,12 +171,29 @@ export default function WhatsGoingOnScreen() {
           showsVerticalScrollIndicator={false}>
           <Animated.View
             entering={settle}
-            style={[column, { paddingTop: insets.top + ElseaS02.backTop }]}>
-            <ElseaBackButton onPress={() => router.back()} />
+            style={[column, { paddingTop: insets.top + S.headerTop }]}>
+            {/* Header. Chevron, wordmark, and nothing on the right — the
+                spacer is what keeps the mark optically centred. */}
+            <View style={styles.header}>
+              <ElseaBackButton onPress={() => router.back()} />
+              <View style={styles.headerCentre}>
+                <ElseaWordmark width={S.headerMarkWidth} />
+              </View>
+              <View style={styles.headerSpacer} />
+            </View>
 
-            <ElseaHeading style={{ marginTop: m.backToHeading }}>What&apos;s going on?</ElseaHeading>
+            <ElseaHeading
+              style={[styles.heading, { fontSize: head.size, lineHeight: head.leading }]}>
+              What&apos;s going on?
+            </ElseaHeading>
 
-            <View style={{ marginTop: m.headingToInput }}>
+            <Text
+              style={[styles.intro, { marginTop: S.headingToIntro }]}
+              maxFontSizeMultiplier={ElseaFontScaleCap.helper}>
+              Tell me what’s happening...
+            </Text>
+
+            <View style={{ marginTop: S.introToInput }}>
               <ElseaSituationInput
                 value={situationText}
                 onChangeText={setSituationText}
@@ -146,28 +204,42 @@ export default function WhatsGoingOnScreen() {
             </View>
 
             <Text
-              style={[styles.prompt, { marginTop: m.inputToPrompt }]}
+              style={[styles.example, { marginTop: S.inputToHelper }]}
               maxFontSizeMultiplier={ElseaFontScaleCap.helper}>
-              Or choose how you feel right now:
+              {SITUATION_EXAMPLE}
             </Text>
 
-            {/* Wrapping rows, not a list. Available width decides the breaks. */}
-            <View style={styles.chips}>
-              {ELSEA_SHORTCUTS.map((label) => (
-                <ElseaShortcutChip
-                  key={label}
-                  label={label}
-                  selected={shortcut === label}
-                  onPress={() => onShortcut(label)}
-                  accessibilityHint="Chooses this as how you feel right now."
-                />
+            <Text
+              style={[styles.prompt, { marginTop: S.inputToPrompt }]}
+              maxFontSizeMultiplier={ElseaFontScaleCap.helper}>
+              Or, start with how you feel
+            </Text>
+
+            {/* Three equal columns. Nine choices fill the grid exactly. */}
+            <View style={[styles.grid, { marginTop: S.promptToPills }]}>
+              {PILL_ROWS.map((row) => (
+                <View key={row.join('-')} style={styles.gridRow}>
+                  {row.map((label) =>
+                    label === MORE ? (
+                      <ElseaStatePill
+                        key={label}
+                        label={label}
+                        quiet
+                        onPress={onMoreOptions}
+                        accessibilityHint="More ways to describe how you feel. Not available yet."
+                      />
+                    ) : (
+                      <ElseaStatePill
+                        key={label}
+                        label={label}
+                        selected={shortcut === label}
+                        onPress={() => onShortcut(label)}
+                        accessibilityHint="Chooses this as how you feel right now."
+                      />
+                    )
+                  )}
+                </View>
               ))}
-              <ElseaShortcutChip
-                label="More options"
-                quiet
-                onPress={onMoreOptions}
-                accessibilityHint="More ways to describe how you feel. Not available yet."
-              />
             </View>
           </Animated.View>
 
@@ -188,14 +260,20 @@ export default function WhatsGoingOnScreen() {
           <ElseaPrimaryAction
             label="Continue"
             disabled={!canContinue}
-            tone="gradientViolet"
-            height={ElseaS02.ctaHeight}
-            borderRadius={ElseaS02.ctaRadius}
-            fontSize={ElseaS02.ctaTextSize}
-            lineHeight={ElseaS02.ctaTextLeading}
+            // The same gradient and the same dark label as Screen 1's CTA:
+            // one action language across the entry flow.
+            tone="welcome"
+            height={ElseaWelcome.ctaHeight}
+            borderRadius={ElseaWelcome.ctaRadius}
+            fontSize={cta.cta}
+            lineHeight={cta.cta * 1.2}
             elevated={false}
+            glowColor={canContinue ? ElseaWelcomeColor.lavender : undefined}
             accessibilityHint="Sends what you have written so we can work out what will help."
             onPress={onContinue}
+            trailing={
+              <Text style={[styles.arrow, { fontSize: cta.cta }]}>→</Text>
+            }
           />
         </Animated.View>
       </KeyboardAvoidingView>
@@ -220,17 +298,56 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexShrink: 1,
   },
-  prompt: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerCentre: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  /** Balances the back button so the wordmark sits on the true centre. */
+  headerSpacer: {
+    width: ElseaSize.minTouchTarget,
+  },
+  /**
+   * Overrides the shared heading's weight and scale for this screen only.
+   * `ElseaHeading` is used by later screens whose treatment is not in scope,
+   * so the lighter, larger setting is applied here rather than to the token.
+   */
+  heading: {
+    marginTop: S.headerToHeading,
+    fontWeight: '400',
+    letterSpacing: -0.4,
+    color: C.heading,
+  },
+  intro: {
     fontSize: ElseaS02.promptSize,
     lineHeight: ElseaS02.promptLeading,
     fontWeight: '400',
-    color: C.prompt,
+    color: C.intro,
   },
-  chips: {
-    marginTop: ElseaS02.chipsTop,
+  example: {
+    fontSize: S.helperSize,
+    lineHeight: S.helperLeading,
+    fontWeight: '400',
+    color: C.helper,
+  },
+  prompt: {
+    fontSize: S.promptSize,
+    lineHeight: S.promptLeading,
+    fontWeight: '400',
+    color: C.intro,
+  },
+  grid: {
+    rowGap: S.pillGap,
+  },
+  gridRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    columnGap: ElseaS02.chipGap,
-    rowGap: ElseaS02.chipGap,
+    columnGap: S.pillGap,
+  },
+  arrow: {
+    fontWeight: '500',
+    color: ElseaWelcomeColor.ctaLabel,
   },
 });

@@ -37,7 +37,7 @@ const C = ElseaS02Color;
  *
  * ROUTING, and why each branch goes where it does:
  *
- *   interpreted   → Screen 04. Safety cleared, and we understood.
+ *   interpreted   → target + time. Safety cleared, and we understood.
  *   needs_picker  → the correction screen. Safety cleared, but we did not
  *                   understand well enough to put words in someone's mouth,
  *                   so they choose. A normal path, not an error.
@@ -125,7 +125,10 @@ export default function UnderstandingScreen() {
         name: 'interpretation_presented',
         transition: outcome.interpretation.transitionKey,
       });
-      replaceWith('interpretation');
+      // Straight to target + time. That screen now carries the confirmation:
+      // the interpreted target arrives pre-selected and can be overridden
+      // there, so a separate confirm step would ask the same question twice.
+      replaceWith('time');
     };
 
     void run();

@@ -80,9 +80,10 @@ export const TimeCopy = {
 
 /** PRODUCT COPY REVIEW REQUIRED — the four approved V1 time options. */
 export const DURATION_LABEL: Record<DurationChoice, { title: string; detail: string }> = {
-  short: { title: '2–5 minutes', detail: 'A quick reset' },
-  medium: { title: '5–10 minutes', detail: 'A deeper shift' },
-  long: { title: '10–20 minutes', detail: 'When you have space' },
+  short: { title: '5 minutes', detail: 'A quick reset' },
+  medium: { title: '10 minutes', detail: 'A deeper shift' },
+  long: { title: '15 minutes', detail: 'When you have space' },
+  extended: { title: '20+ minutes', detail: 'The long version' },
   unsure: { title: 'Not sure', detail: 'ELSEA will suggest' },
 };
 

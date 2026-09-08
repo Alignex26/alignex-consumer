@@ -84,18 +84,34 @@ export type Interpretation = {
 
 export type RunOrigin = 'interpreted' | 'corrected' | 'picker' | 'quick_return';
 
-/** The four approved V1 time choices. `unsure` lets ELSEA decide. */
-export const DURATION_CHOICES = ['short', 'medium', 'long', 'unsure'] as const;
+/**
+ * The approved V1 time choices. `unsure` lets ELSEA decide.
+ *
+ * The names are historical; each now denotes one exact duration rather than a
+ * span — see `DURATION_RANGE`.
+ */
+export const DURATION_CHOICES = ['short', 'medium', 'long', 'extended', 'unsure'] as const;
 export type DurationChoice = (typeof DURATION_CHOICES)[number];
 
 /**
- * Each choice as a second range, used to filter the catalogue. `unsure` has no
- * bounds — selection falls back to the catalogue's own default behaviour.
+ * Each choice as an exact number of seconds, expressed as a degenerate range
+ * so the filtering code stays one shape.
+ *
+ * These were spans (2-5, 5-10, 10-20 minutes) and are now exact, because
+ * spans could not tell 15 minutes from 20: both fell inside 600-1200, so the
+ * two selectors behaved identically, and asking for 15 could return a 20
+ * minute session for the wired-to-sleep family — overshooting the time
+ * someone said they had.
+ *
+ * `unsure` keeps no bounds: it is the one choice that means "you decide", and
+ * it resolves to the shortest approved session so a first experience is never
+ * longer than expected.
  */
 export const DURATION_RANGE: Record<DurationChoice, { min: number; max: number } | null> = {
-  short: { min: 120, max: 300 },
-  medium: { min: 300, max: 600 },
-  long: { min: 600, max: 1200 },
+  short: { min: 300, max: 300 },
+  medium: { min: 600, max: 600 },
+  long: { min: 900, max: 900 },
+  extended: { min: 1200, max: 1200 },
   unsure: null,
 };
 

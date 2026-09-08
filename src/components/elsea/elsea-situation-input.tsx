@@ -2,16 +2,20 @@ import { useState } from 'react';
 import { StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { PRODUCT_NAME } from '@/constants/brand';
-import { ElseaFontScaleCap, ElseaS02, ElseaS02Color } from '@/constants/elsea';
+import { ElseaEntryS2, ElseaEntryS2Color, ElseaFontScaleCap } from '@/constants/elsea';
+
+/** The field's own prompt. Short, so the surface stays quiet before typing. */
+export const SITUATION_PLACEHOLDER = 'Type here...';
 
 /**
- * The canonical example. Deliberately a whole real situation, not a prompt.
+ * The canonical example, kept but demoted.
  *
- * Written as one continuous string: it wraps naturally to whatever the device
- * width allows. The reference's three lines are what it happens to look like at
- * the canonical width, not a line structure to force.
+ * It used to live inside the placeholder, where a whole worked situation was
+ * the loudest text on the screen. It now sits under the field as helper text
+ * at a smaller size and lower contrast: still there for someone who cannot
+ * find the words, no longer competing with the field itself.
  */
-export const SITUATION_PLACEHOLDER = `Tell ${PRODUCT_NAME} what’s happening... (e.g. “Work was intense and I can’t switch off”)`;
+export const SITUATION_EXAMPLE = 'e.g. “Work was intense and I can’t switch off”';
 
 type Props = {
   value: string;
@@ -24,18 +28,22 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
-const C = ElseaS02Color;
+const C = ElseaEntryS2Color;
 
 /**
- * The listening surface — the dominant element of Screen 02.
+ * The listening surface.
  *
- * A pale lilac field sitting inside the dark violet environment: matte and
- * luminous rather than white, grey, glass or translucent black, so it reads as
- * an illuminated surface the person writes onto. No shadow, no outer glow, no
- * microphone, no counter.
+ * Midnight indigo with a very subtle violet hairline and a large radius — it
+ * belongs to the dark interface rather than sitting on top of it. The pale
+ * lilac block this replaces was the one element that broke the composition:
+ * at roughly a quarter of the screen it dominated everything, and a light
+ * surface that size cannot be toned into a dark screen.
  *
- * Focus moves the hairline from white to lilac. Only the colour changes —
- * the width is constant, so nothing shifts as the border lights up.
+ * No glass, no blur, no fill glow, no microphone, no counter. Focus brightens
+ * the hairline and nothing else — the width is constant, so nothing shifts.
+ *
+ * Behaviour is unchanged from the pale version: free text, multiline, Return
+ * inserts a newline and never submits, and nothing is interpreted here.
  */
 export function ElseaSituationInput({
   value,
@@ -67,11 +75,13 @@ export function ElseaSituationInput({
         autoCapitalize="sentences"
         autoCorrect
         keyboardType="default"
-        keyboardAppearance="light"
+        // Follows the surface. A light keyboard under a dark field was the
+        // giveaway that the pale block was still setting the tone.
+        keyboardAppearance="dark"
         // Return inserts a newline; it never submits. (`submitBehavior`
         // supersedes the deprecated `blurOnSubmit`.)
         submitBehavior="newline"
-        selectionColor={C.ctaSolid}
+        selectionColor={C.pillSelectedBorder}
         maxFontSizeMultiplier={ElseaFontScaleCap.input}
         accessibilityLabel={`Tell ${PRODUCT_NAME} what's going on`}
         accessibilityHint="Describe what's happening in your own words."
@@ -83,10 +93,10 @@ export function ElseaSituationInput({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    borderRadius: ElseaS02.inputRadius,
+    borderRadius: ElseaEntryS2.inputRadius,
     backgroundColor: C.inputSurface,
     borderWidth: 1,
-    padding: ElseaS02.inputPadding,
+    padding: ElseaEntryS2.inputPadding,
   },
   input: {
     flex: 1,

@@ -64,7 +64,7 @@ export default function QuickReturnScreen() {
     setWorking(true);
 
     const choice = choiceForRun(chosen);
-    const result = await selectSession(chosen.transitionKey, choice, userId);
+    const result = await selectSession(chosen.transitionKey, choice);
 
     if (!result.ok) {
       setFailure(result.failure === 'network' ? 'network' : 'selection');

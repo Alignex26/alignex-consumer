@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -11,6 +12,7 @@ import {
   ElseaArrivalColor,
   ElseaColor,
   ElseaS02Color,
+  ElseaWelcomeColor,
   ElseaFontScaleCap,
   ElseaMotion,
   ElseaRadius,
@@ -31,10 +33,21 @@ type Props = {
   /** Screen 01 lifts the action off the field; Screen 02's spec has no shadow. */
   elevated?: boolean;
   /**
-   * `lilac` is Screen 01's; `gradientViolet` is Screen 02's Continue. `pale`
-   * and `violet` predate them and are kept so nothing else has to change.
+   * A restrained coloured halo under the surface, for the entry-screen CTA.
+   *
+   * Opt-in and off by default, so no screen outside the entry flow changes.
+   * Deliberately low opacity over a wide radius: enough that the button sits
+   * in its own light, well short of the neon the direction rules out.
    */
-  tone?: 'pale' | 'violet' | 'lilac' | 'gradientViolet';
+  glowColor?: string;
+  /**
+   * `lilac` is Screen 01's; `gradientViolet` is Screen 02's Continue;
+   * `welcome` is the Screen 1 CTA. `pale` and `violet` predate them and are
+   * kept so nothing else has to change.
+   */
+  tone?: 'pale' | 'violet' | 'lilac' | 'gradientViolet' | 'welcome';
+  /** Trailing glyph, kept out of the accessibility label. Screen 1's arrow. */
+  trailing?: ReactNode;
   /** Defaults to 58. Screen 01's reference CTA is 54. */
   height?: number;
   /** Defaults to 17/22. Screen 01's reference CTA is 15/20. */
@@ -84,6 +97,24 @@ const TONE = {
       ],
     },
   },
+  // Screen 1. Pale electric blue at the left, lavender through the centre,
+  // soft pink at the right, with near-black text.
+  welcome: {
+    surface: ElseaWelcomeColor.lavender,
+    surfacePressed: ElseaWelcomeColor.lavender,
+    label: ElseaWelcomeColor.ctaLabel,
+    disabledSurface: withAlpha(ElseaWelcomeColor.lavender, ElseaSurfaceAlpha.actionDisabled),
+    disabledLabel: withAlpha(ElseaWelcomeColor.offWhite, ElseaTextAlpha.disabledLabel),
+    gradient: {
+      type: 'linear-gradient' as const,
+      direction: '90deg',
+      colorStops: [
+        { color: ElseaWelcomeColor.electricBlue, positions: ['0%'] },
+        { color: ElseaWelcomeColor.lavender, positions: ['52%'] },
+        { color: ElseaWelcomeColor.softPink, positions: ['100%'] },
+      ],
+    },
+  },
 } as const;
 
 /**
@@ -104,10 +135,12 @@ export function ElseaPrimaryAction({
   disabled = false,
   borderRadius = ElseaRadius.action,
   elevated = true,
+  glowColor,
   tone = 'pale',
   height = ElseaSize.actionHeight,
   fontSize = ElseaType.buttonSize,
   lineHeight = ElseaType.buttonLeading,
+  trailing,
 }: Props) {
   const palette = TONE[tone];
   const gradient = 'gradient' in palette ? palette.gradient : undefined;
@@ -164,20 +197,34 @@ export function ElseaPrimaryAction({
             : [
                 styles.surfaceBase,
                 elevated && styles.elevated,
+                glowColor && {
+                  shadowColor: glowColor,
+                  shadowOpacity: 0.3,
+                  shadowRadius: 22,
+                  shadowOffset: { width: 0, height: 8 },
+                  elevation: 8,
+                },
                 { height, borderRadius },
                 gradient && { experimental_backgroundImage: [gradient] },
                 animatedStyle,
               ]
         }>
-        <Text
-          style={[
-            styles.label,
-            { fontSize, lineHeight, color: disabled ? palette.disabledLabel : palette.label },
-          ]}
-          numberOfLines={1}
-          maxFontSizeMultiplier={ElseaFontScaleCap.action}>
-          {label}
-        </Text>
+        <View style={styles.labelRow}>
+          <Text
+            style={[
+              styles.label,
+              { fontSize, lineHeight, color: disabled ? palette.disabledLabel : palette.label },
+            ]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={ElseaFontScaleCap.action}>
+            {label}
+          </Text>
+          {trailing ? (
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              {trailing}
+            </View>
+          ) : null}
+        </View>
       </Animated.View>
     </Pressable>
   );
@@ -196,6 +243,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 14 },
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   label: {
     fontWeight: '600',

@@ -84,14 +84,20 @@ export function routeForPhase(phase: Exclude<Phase, 'session_paused' | 'early_ex
  *   input        → safety_check ONLY. There is no edge from input to
  *                  interpretation, which is what makes the gate unskippable
  *                  in the flow model as well as on the server.
- *   safety_check → interpretation (safe), support (diverted), or error
- *                  (the gate itself failed — fail closed, never onward).
+ *   safety_check → time_selection (safe and understood), correction (safe
+ *                  but not understood well enough to act on), support
+ *                  (diverted), or error (the gate itself failed — fail
+ *                  closed, never onward).
  *   support      → arrival | home. It never continues into the session path.
+ *
+ * `interpretation` is no longer on the main path: target + time absorbed the
+ * confirm step, so the gate routes straight there. The phase and its route
+ * remain for the correction flow and for recovery.
  */
 export const ALLOWED_NEXT: Record<Phase, readonly Phase[]> = {
   arrival: ['input', 'home'],
   input: ['safety_check'],
-  safety_check: ['interpretation', 'support', 'error', 'offline'],
+  safety_check: ['time_selection', 'correction', 'support', 'error', 'offline'],
   // A safety diversion is a terminus for this attempt. It leads out of the
   // flow, never further into it.
   support: ['arrival', 'home'],

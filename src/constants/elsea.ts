@@ -555,3 +555,306 @@ export const ELSEA_SHORTCUTS = [
 ] as const;
 
 export type ElseaShortcut = (typeof ELSEA_SHORTCUTS)[number];
+
+/**
+ * SCREEN 1 — WELCOME.
+ *
+ * The locked reference for the first-entry screen. Scoped to this screen so
+ * nothing here can disturb Screen 02's appearance.
+ *
+ * PALETTE NOTE: §9 of the spec supplies the ELSEA palette, but §5 and §7
+ * require a pink and a pale electric blue that the palette does not contain —
+ * the headline's pink-to-blue ramp and the CTA's blue-to-pink gradient. The
+ * three values below are derived to sit with the approved set rather than
+ * taken from it, and are flagged in the implementation report.
+ */
+export const ElseaWelcomeColor = {
+  // --- Ground (all from the approved palette) --------------------------
+  base: '#08071A',
+  groundTop: '#070719',
+  groundMid: '#0C0A24',
+  groundLow: '#17103B',
+
+  // --- Type ------------------------------------------------------------
+  offWhite: '#FAF8FC',
+  paleLilac: '#EADFFF',
+  muted: '#C9BDD5',
+
+  // --- Derived, not from the approved palette --------------------------
+  /** Left end of the CTA, right end of "today?". */
+  electricBlue: '#A9C9FF',
+  /** Centre of both ramps. Sits between #B58AFF and #EADFFF. */
+  lavender: '#C3A6FF',
+  /** Right end of the CTA, left end of "today?". */
+  softPink: '#F3C4DF',
+
+  /** CTA label. Near-black, per §7. */
+  ctaLabel: '#0B0A18',
+} as const;
+
+/** Type sizes by width class, from the ranges in §11. */
+/**
+ * `wordmark` and `orb` are VISIBLE widths in points — the width of the ink,
+ * not of the PNG canvas. Both approved assets carry transparent padding, so
+ * sizing by the canvas would silently render the mark smaller than specified
+ * and by a different amount for each asset. `ElseaMarkAsset` converts.
+ */
+export const ElseaWelcomeType = {
+  narrow: { wordmark: 148, tagline: 11, headline: 36, support: 15, cta: 17, account: 13, orb: 220 },
+  standard: { wordmark: 164, tagline: 11.5, headline: 39, support: 16, cta: 17, account: 13, orb: 240 },
+  wide: { wordmark: 178, tagline: 12, headline: 42, support: 17, cta: 18, account: 14, orb: 258 },
+} as const;
+
+/**
+ * Vertical rhythm by height class. §10 requires whitespace to be reduced
+ * before component size is, so only the gaps step here — never the type.
+ */
+/**
+ * `orbGap` and `messageGap` are MINIMUMS, not fixed gaps. Both sit on flexible
+ * spacers, so on a standard or tall screen the leftover height is dealt out
+ * around the orb as negative space, and on a short screen those spacers give
+ * their room back before anything readable or tappable is touched — which is
+ * the "reduce empty vertical spacing first" rule expressed in the layout
+ * rather than in a device check.
+ *
+ * They are set LOW on purpose. A `minHeight` on a flexible item is a floor
+ * that cannot be shrunk past, so a generous minimum does not produce generous
+ * space — it produces overflow, and the account link falls off the bottom of a
+ * 393 x 852 iPhone. Keeping the floors small and letting `flexGrow` deal out
+ * whatever is actually left is what gives real negative space on the screens
+ * that have the height and a clean fit on the ones that do not.
+ *
+ * `orbScale` is the one thing a short screen is allowed to shrink, and only
+ * after the spacers have already collapsed. The orb is artwork, not a control.
+ */
+export const ElseaWelcomeSpace = {
+  compact: { brandTop: 4, taglineTop: 8, orbGap: 10, messageGap: 12, supportTop: 8, ctaGap: 14, accountTop: 2, orbScale: 0.62 },
+  standard: { brandTop: 14, taglineTop: 14, orbGap: 20, messageGap: 20, supportTop: 14, ctaGap: 26, accountTop: 8, orbScale: 1 },
+  tall: { brandTop: 22, taglineTop: 18, orbGap: 28, messageGap: 28, supportTop: 16, ctaGap: 32, accountTop: 10, orbScale: 1.04 },
+} as const;
+
+/**
+ * SCREEN 1 — compact-height caps.
+ *
+ * Measured, not guessed. At the standard width class on a 390 x 670 frame the
+ * full composition needs about 700pt against roughly 600pt of usable height,
+ * so the CTA clipped and the account link fell off the bottom entirely. The
+ * spacers alone cannot recover that: they were already at their minimum.
+ *
+ * Order of sacrifice, per the responsive rule — empty space first, then the
+ * artwork, and type last and only to a cap. Nothing tappable shrinks: the CTA
+ * keeps its full height and the account link its 44pt target.
+ *
+ * Below 375 x 667 — an iPhone SE 1st generation and smaller, under the modern
+ * minimum — the screen scrolls rather than compress any further. Everything
+ * stays reachable and nothing clips.
+ */
+export const ElseaWelcomeCompact = {
+  maxHeadline: 32,
+  maxSupport: 15,
+} as const;
+
+export const ElseaWelcome = {
+  taglineTracking: 3.4,
+  /** Large rounded rectangle, per the locked direction. */
+  ctaHeight: 58,
+  ctaRadius: 29,
+  /**
+   * 320 rather than 300: at 300 the supporting sentence wraps to three lines
+   * on a standard width, and the third line is what pushed the account link
+   * off the bottom of an iPhone. Two lines is also what the reference shows.
+   */
+  supportMaxWidth: 320,
+} as const;
+
+/**
+ * SCREEN 2 — TARGET STATE + AVAILABLE TIME.
+ *
+ * Shares Screen 1's palette and gradient system rather than defining a second
+ * visual theme: `ElseaWelcomeColor` supplies the ground, the type colours and
+ * the blue-lavender-pink ramp, and the CTA reuses Screen 1's `welcome` tone.
+ * Only the values particular to this screen live here.
+ */
+export const ElseaTargetType = {
+  narrow: { wordmark: 26, tagline: 9, brandRight: 8, heading: 31, support: 14, cardLabel: 15, cardDetail: 11, timeValue: 19, timeUnit: 10 },
+  standard: { wordmark: 29, tagline: 10, brandRight: 9, heading: 38, support: 16, cardLabel: 16, cardDetail: 12, timeValue: 21, timeUnit: 10 },
+  wide: { wordmark: 32, tagline: 11, brandRight: 10, heading: 42, support: 17, cardLabel: 17, cardDetail: 13, timeValue: 22, timeUnit: 11 },
+} as const;
+
+export const ElseaTargetSpace = {
+  compact: { headerGap: 8, progressGap: 10, headingGap: 12, supportGap: 6, gridGap: 12, cardGap: 8, timeGap: 10, chipGap: 8, ctaGap: 10, cardPadY: 7, cardMinHeight: 96 },
+  standard: { headerGap: 14, progressGap: 13, headingGap: 15, supportGap: 8, gridGap: 14, cardGap: 10, timeGap: 14, chipGap: 10, ctaGap: 14, cardPadY: 10, cardMinHeight: 118 },
+  tall: { headerGap: 20, progressGap: 22, headingGap: 24, supportGap: 10, gridGap: 26, cardGap: 12, timeGap: 24, chipGap: 10, ctaGap: 24, cardPadY: 15, cardMinHeight: 138 },
+} as const;
+
+/**
+ * Compact-height overrides.
+ *
+ * Section 16 orders vertical gaps to be reduced first, then non-essential
+ * descriptor spacing — both done above. That is not enough on a 667pt screen:
+ * the header, heading, six cards, four time selectors and the action region
+ * come to roughly 770pt of content. What remains after these reductions
+ * scrolls, which section 16 explicitly prefers to shrinking touch targets.
+ *
+ * Type is capped rather than scaled, so it steps at one boundary instead of
+ * drifting with viewport height.
+ */
+export const ElseaTargetCompact = {
+  maxHeading: 28,
+  maxSupport: 13,
+  chipHeight: 62,
+  scrollBottomPad: 26,
+  /**
+   * The grid is the tallest block, so it is where the room comes from. These
+   * shave the two rows enough that the first time selector clears the fade
+   * above the action region and is visible at rest — a control that can only
+   * be reached by scrolling, underneath the button it enables, is not a
+   * control anyone will find.
+   */
+  cardDetail: 10,
+  cardLabel: 15,
+  iconSize: 19,
+  cardGap: 5,
+} as const;
+
+export const ElseaTarget = {
+  cardRadius: 20,
+  cardBorder: 'rgba(146, 103, 226, 0.34)',
+  cardSurface: 'rgba(12, 10, 36, 0.86)',
+  cardSelectedBorder: '#B58AFF',
+  cardSelectedSurface: 'rgba(66, 34, 132, 0.62)',
+  /** Unresolved mappings render, but read as unavailable rather than broken. */
+  cardDisabledOpacity: 0.34,
+  iconSize: 22,
+
+  chipRadius: 18,
+  chipHeight: 74,
+  chipBorder: 'rgba(146, 103, 226, 0.30)',
+  chipSurface: 'rgba(12, 10, 36, 0.86)',
+
+  progressHeight: 3,
+  progressRadius: 2,
+  progressTrack: 'rgba(146, 103, 226, 0.22)',
+
+  ctaHeight: 60,
+  ctaRadius: 30,
+  ctaTextSize: 17,
+
+  brandTracking: 7,
+  taglineTracking: 2.8,
+  labelTracking: 2.4,
+} as const;
+
+/** §3 — brand language only. Not a feature. */
+export const ELSEA_BRAND_RIGHT = ['STATE', 'TRANSITION', 'INTELLIGENCE'] as const;
+
+/**
+ * ENTRY REDESIGN — geometry of the two approved brand assets.
+ *
+ * Both PNGs carry transparent padding around the artwork, and by different
+ * amounts. Sizing either by its canvas would render it smaller than specified
+ * and would make the orb and the wordmark disagree about what "300 wide"
+ * means, so every call site asks for a VISIBLE width and these fractions
+ * convert it to the canvas box the image is drawn into.
+ *
+ * Measured from the files themselves (alpha > 8), not estimated:
+ *   wordmark  2172 x 724   ink x[268..1932] y[194..506]
+ *   orb       1254 x 1254  ink x[102..1155] y[165..1125]
+ *
+ * If either asset is re-exported, re-measure. Nothing else needs to change.
+ */
+export const ElseaMarkAsset = {
+  wordmark: {
+    aspect: 2172 / 724,
+    /** Ink width as a fraction of canvas width. */
+    inkWidth: 1665 / 2172,
+  },
+  orb: {
+    aspect: 1,
+    inkWidth: 1054 / 1254,
+  },
+} as const;
+
+/**
+ * SCREEN 2 — the restyled entry surface.
+ *
+ * Dark throughout. The pale listening surface is gone: it was the one element
+ * that broke the dark composition, and a light block that size cannot be
+ * toned down into it.
+ *
+ * Only two things light up on this screen — the selected pill and the CTA.
+ * Every other value here is deliberately low-contrast against the field.
+ */
+export const ElseaEntryS2Color = {
+  /** Field. Quieter than the shared conversation field. */
+  base: '#07061A',
+  groundTop: '#08071C',
+  groundMid: '#0C0A26',
+  groundLow: '#150E36',
+  /** The single soft violet presence, used at very low alpha. */
+  presence: '#4A2091',
+
+  /** Listening surface — midnight indigo, not a pale block. */
+  inputSurface: 'rgba(21, 14, 48, 0.72)',
+  inputBorder: 'rgba(150, 110, 230, 0.26)',
+  inputBorderFocused: 'rgba(176, 140, 255, 0.58)',
+  inputText: '#F2EDFA',
+  placeholder: '#8478A0',
+
+  /** Headline and the short intro beneath it. */
+  heading: '#FAF8FC',
+  intro: '#B3A7C8',
+  helper: '#8A7EA4',
+
+  /** State pills — dark, subtly outlined, off-white. */
+  pillSurface: 'rgba(24, 16, 54, 0.66)',
+  pillBorder: 'rgba(139, 99, 214, 0.30)',
+  pillText: '#EDE7F7',
+  /** `More` is the same family, one step quieter. */
+  pillQuietBorder: 'rgba(139, 99, 214, 0.18)',
+  pillQuietText: '#9C90B4',
+  /** Selected: illuminated fill, finer brighter border, restrained glow. */
+  pillSelectedFrom: 'rgba(118, 82, 216, 0.62)',
+  pillSelectedTo: 'rgba(176, 118, 224, 0.52)',
+  pillSelectedBorder: '#A87BF5',
+  pillSelectedText: '#FFFFFF',
+  pillGlow: '#8F5CF2',
+} as const;
+
+/**
+ * Screen 2 headline scale.
+ *
+ * Held apart from `ElseaHeadingScale`, which is the shared heading used by
+ * every later screen. This screen's heading is larger and lighter, and that
+ * treatment must not leak onto screens outside this redesign.
+ */
+export const ElseaEntryS2Head = {
+  narrow: { size: 29, leading: 35 },
+  standard: { size: 31, leading: 37 },
+  wide: { size: 33, leading: 39 },
+} as const;
+
+export const ElseaEntryS2 = {
+  /** Substantially smaller than Screen 1's mark. Visible ink width. */
+  headerMarkWidth: 86,
+  headerTop: 4,
+  headerToHeading: 26,
+  headingToIntro: 10,
+  introToInput: 18,
+  inputRadius: 22,
+  inputPadding: 18,
+  inputToHelper: 10,
+  helperSize: 12,
+  helperLeading: 17,
+  inputToPrompt: 26,
+  promptSize: 13,
+  promptLeading: 18,
+  promptToPills: 14,
+
+  /** A three-column grid. Nine choices fill it exactly. */
+  pillColumns: 3,
+  pillHeight: 48,
+  pillRadius: 14,
+  pillGap: 10,
+  pillTextSize: 14,
+} as const;

@@ -1,82 +1,95 @@
 import { StatusBar } from 'expo-status-bar';
 import { useCallback } from 'react';
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, useReducedMotion } from 'react-native-reanimated';
+import { ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 
-import { ElseaArrivalField } from '@/components/elsea/elsea-arrival-field';
+import { ElseaOrb } from '@/components/elsea/elsea-orb';
 import { ElseaPrimaryAction } from '@/components/elsea/elsea-primary-action';
 import { ElseaTextAction } from '@/components/elsea/elsea-text-action';
 import { ElseaWordmark } from '@/components/elsea/elsea-wordmark';
-import { PRODUCT_NAME } from '@/constants/brand';
 import {
-  ElseaActionBottomMin,
-  ElseaActionType,
-  ElseaArrivalColor,
-  ElseaArrivalHeadline,
-  ElseaArrivalLayout,
-  ElseaBreakpoint,
   ElseaFontScaleCap,
-  ElseaMotion,
-  ElseaRadius,
-  withAlpha,
+  ElseaWelcome,
+  ElseaWelcomeColor,
+  ElseaWelcomeCompact,
+  ElseaWelcomeSpace,
+  ElseaWelcomeType,
 } from '@/constants/elsea';
 import { useElseaLayout } from '@/layout/use-elsea-layout';
 import { navigateTo } from '@/navigation/elsea-routes';
 
-const C = ElseaArrivalColor;
-const L = ElseaArrivalLayout;
-const H = ElseaArrivalHeadline;
+const C = ElseaWelcomeColor;
+const W = ElseaWelcome;
+
+const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
 
 /**
- * SCREEN 01 — FIRST ARRIVAL
+ * The ground. Near-black indigo, deepening very slightly toward the lower
+ * third so the orb has somewhere to sit.
  *
- * Four conceptual regions, none of which is a visible container:
- *
- *   A  brand      — below the top safe area, centred
- *   B  message    — headline and supporting copy
- *   C  atmosphere — the flexible space above and below B
- *   D  action     — CTA and account link, anchored to the bottom
- *
- * Nothing here is positioned by screen coordinate. The headline lands near the
- * midpoint of the usable area on the canonical frame because the flexible
- * spaces either side of it are split 61/39, not because it is told to sit at
- * 420pt or at 49%. Shorter viewports therefore take space out of C above the
- * message before they take it from below — the ratio does that on its own.
- *
- * The upper three regions sit in a ScrollView so that an accessibility text
- * size which genuinely outgrows the viewport reflows instead of clipping. The
- * action region is outside it and stays attached to the bottom.
+ * No bloom, no trails, no ambient violet wash. Whatever light this screen has
+ * belongs to the orb and the CTA; the field itself stays quiet, which is what
+ * lets 260-odd points of artwork read as luminous rather than as one bright
+ * thing among several.
  */
-export default function FirstArrivalScreen() {
+const ground: ViewStyle = {
+  ...FILL,
+  backgroundColor: C.base,
+  experimental_backgroundImage: [
+    {
+      type: 'linear-gradient' as const,
+      direction: '180deg',
+      colorStops: [
+        { color: C.groundTop, positions: ['0%'] },
+        { color: C.groundMid, positions: ['46%'] },
+        { color: C.groundLow, positions: ['100%'] },
+      ],
+    },
+  ],
+};
+
+/**
+ * SCREEN 1 — WELCOME.
+ *
+ * The brand moment. Six things on the screen and a great deal of space:
+ * wordmark, tagline, orb, the proposition, its supporting line, and the action
+ * pair. Nothing else — no Skip, no settings, no cards, no borders, no second
+ * illustration.
+ *
+ * The orb is deliberately smaller than the space it sits in. The room that
+ * frees goes to the two flexible spaces either side of it, never to enlarging
+ * anything else.
+ *
+ * The vertical composition is two flexible spaces either side of the orb. That
+ * is what produces the negative space on a tall phone and, on a short one,
+ * gives that space back before anything readable or tappable is touched — the
+ * height classes only set the MINIMUM those spaces may collapse to.
+ *
+ * Routing is unchanged: the CTA goes to the situation screen, the account link
+ * to sign-in.
+ */
+export default function WelcomeScreen() {
   const { insets, layoutClass, widthClass, horizontalGutter, contentMaxWidth } = useElseaLayout();
-  const { fontScale } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
 
-  const bp = ElseaBreakpoint[layoutClass];
-  // Width, not height, decides the headline: what matters is whether the first
-  // sentence has room to stay on one line.
-  const headline = H[widthClass];
+  const type = ElseaWelcomeType[widthClass];
+  const space = ElseaWelcomeSpace[layoutClass];
 
-  const onTellUs = useCallback(() => navigateTo('situation'), []);
+  // A short screen caps the type rather than scaling it, so it steps once at
+  // the boundary instead of drifting with viewport height.
+  const compact = layoutClass === 'compact';
+  const headlineSize = compact
+    ? Math.min(type.headline, ElseaWelcomeCompact.maxHeadline)
+    : type.headline;
+  const supportSize = compact
+    ? Math.min(type.support, ElseaWelcomeCompact.maxSupport)
+    : type.support;
+
+  const onStart = useCallback(() => navigateTo('situation'), []);
   const onSignIn = useCallback(() => navigateTo('signIn'), []);
 
-  // RN scales fontSize with the system font scale but leaves lineHeight alone,
-  // so explicit leading has to be scaled by hand or long copy collides.
-  const headlineScale = Math.min(fontScale, ElseaFontScaleCap.headline);
-  const supportingScale = Math.min(fontScale, ElseaFontScaleCap.supporting);
-
-  const brandEntering = FadeIn.duration(ElseaMotion.brandDuration).delay(ElseaMotion.brandDelay);
-
-  // Reduce Motion drops the vertical settle and arrives on opacity alone.
-  const heroEntering = reduceMotion
-    ? FadeIn.duration(ElseaMotion.heroDuration).delay(ElseaMotion.heroDelay)
-    : FadeInDown.duration(ElseaMotion.heroDuration)
-        .delay(ElseaMotion.heroDelay)
-        .withInitialValues({ transform: [{ translateY: ElseaMotion.heroTravel }] });
-
-  const actionsEntering = FadeIn.duration(ElseaMotion.actionsDuration).delay(
-    ElseaMotion.actionsDelay
-  );
+  // A single soft entrance. Nothing repeats, nothing bounces, nothing pulses.
+  const entrance = FadeIn.duration(reduceMotion ? 0 : 620).delay(reduceMotion ? 0 : 60);
 
   const column = {
     width: '100%',
@@ -87,103 +100,88 @@ export default function FirstArrivalScreen() {
 
   return (
     <View style={styles.root}>
-      <ElseaArrivalField />
+      <View style={ground} pointerEvents="none" />
       <StatusBar style="light" />
 
-      <View style={styles.flex}>
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={styles.scrollContent}
-          bounces={false}
-          showsVerticalScrollIndicator={false}>
-          {/* A — brand */}
-          <Animated.View
-            entering={brandEntering}
-            style={[column, styles.brand, { marginTop: insets.top + bp.brandMarginTop }]}>
-            <ElseaWordmark />
-          </Animated.View>
-
-          {/* C — flexible space above the message */}
-          <View style={{ flexGrow: L.spaceAboveMessage, flexShrink: 1 }} />
-
-          {/* B — message */}
-          <Animated.View entering={heroEntering} style={column}>
-            {/*
-              Two separate Text nodes, not one string with a newline in it. The
-              composition is two locked lines, and a newline would still let
-              "Change how you feel." break internally on a narrow width and turn
-              the headline into three ragged lines. As separate nodes each
-              sentence is measured on its own, so the break between them is the
-              only one that can happen at standard and wide widths.
-
-              Grouped for assistive technology so it is announced as one heading.
-            */}
-            <View accessible accessibilityRole="header">
-              <Text
-                style={[
-                  styles.headline,
-                  { fontSize: headline.size, lineHeight: headline.leading * headlineScale },
-                ]}
-                maxFontSizeMultiplier={ElseaFontScaleCap.headline}>
-                Change how you feel.
-              </Text>
-              <Text
-                style={[
-                  styles.headline,
-                  { fontSize: headline.size, lineHeight: headline.leading * headlineScale },
-                ]}
-                maxFontSizeMultiplier={ElseaFontScaleCap.headline}>
-                Not who you are.
-              </Text>
-            </View>
-            <Text
-              style={[
-                styles.supporting,
-                {
-                  marginTop: bp.headlineToSupporting,
-                  marginRight: L.supportingRightInset,
-                  fontSize: bp.supportingSize,
-                  lineHeight: bp.supportingLeading * supportingScale,
-                },
-              ]}
-              maxFontSizeMultiplier={ElseaFontScaleCap.supporting}>
-              Tell {PRODUCT_NAME} what’s going on.{'\n'}We’ll help you get ready for what comes next.
-            </Text>
-          </Animated.View>
-
-          {/* C — flexible space below the message */}
-          <View
-            style={{
-              flexGrow: L.spaceBelowMessage,
-              flexShrink: 1,
-              minHeight: L.minSpaceBelowMessage,
-            }}
-          />
-        </ScrollView>
-
-        {/* D — action region. One block; the two controls belong together. */}
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        bounces={false}
+        showsVerticalScrollIndicator={false}>
         <Animated.View
-          entering={actionsEntering}
+          entering={entrance}
           style={[
             column,
-            { paddingBottom: Math.max(insets.bottom, ElseaActionBottomMin) },
+            styles.body,
+            {
+              paddingTop: insets.top + space.brandTop,
+              paddingBottom: insets.bottom + 12,
+            },
           ]}>
-          <ElseaPrimaryAction
-            label="Tell me what’s going on"
-            accessibilityHint="Describe your situation in your own words"
-            tone="lilac"
-            height={bp.ctaHeight}
-            borderRadius={ElseaRadius.action}
-            fontSize={ElseaActionType.size}
-            lineHeight={ElseaActionType.leading}
-            elevated={false}
-            onPress={onTellUs}
-          />
-          <View style={{ marginTop: bp.ctaToAccount }}>
-            <ElseaTextAction label="I already have an account" onPress={onSignIn} />
+          {/* Brand. */}
+          <ElseaWordmark width={type.wordmark} />
+
+          <Text
+            style={[styles.tagline, { fontSize: type.tagline, marginTop: space.taglineTop }]}
+            maxFontSizeMultiplier={ElseaFontScaleCap.helper}>
+            A BRIGHTER YOU{'\n'}ON YOUR TERMS
+          </Text>
+
+          {/* Negative space. Collapses to its minimum before the orb shrinks. */}
+          <View style={[styles.space, { minHeight: space.orbGap }]} />
+
+          <ElseaOrb size={type.orb * space.orbScale} />
+
+          <View style={[styles.space, { minHeight: space.messageGap }]} />
+
+          {/* The proposition. Two lines, set light, in one colour — no ramp
+              on any word and no glow, so the orb keeps the only light. */}
+          <Text
+            style={[
+              styles.headline,
+              { fontSize: headlineSize, lineHeight: headlineSize * 1.22 },
+            ]}
+            accessibilityRole="header"
+            maxFontSizeMultiplier={ElseaFontScaleCap.headline}>
+            Don’t take it{'\n'}with you.
+          </Text>
+
+          <Text
+            style={[
+              styles.support,
+              {
+                fontSize: supportSize,
+                lineHeight: supportSize * 1.5,
+                marginTop: space.supportTop,
+              },
+            ]}
+            maxFontSizeMultiplier={ElseaFontScaleCap.supporting}>
+            How you feel now doesn’t have{'\n'}to decide how you feel next.
+          </Text>
+
+          <View style={{ height: space.ctaGap }} />
+
+          <View style={styles.ctaBlock}>
+            <ElseaPrimaryAction
+              label="Make the shift"
+              accessibilityHint="Describe what’s going on and get a session."
+              tone="welcome"
+              height={W.ctaHeight}
+              borderRadius={W.ctaRadius}
+              fontSize={type.cta}
+              lineHeight={type.cta * 1.2}
+              elevated={false}
+              glowColor={C.lavender}
+              onPress={onStart}
+              trailing={<Text style={[styles.arrow, { fontSize: type.cta }]}>→</Text>}
+            />
+
+            <View style={{ marginTop: space.accountTop }}>
+              <ElseaTextAction label="I already have an account" onPress={onSignIn} />
+            </View>
           </View>
         </Animated.View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -191,31 +189,58 @@ export default function FirstArrivalScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: C.baseBlackIndigo,
+    backgroundColor: C.base,
   },
   flex: {
     flex: 1,
   },
-  scrollContent: {
-    // Behaves exactly like a flex column while the content fits, and becomes
-    // scrollable only when an accessibility text size makes it overflow.
+  scroll: {
     flexGrow: 1,
   },
-  brand: {
+  body: {
+    flexGrow: 1,
     alignItems: 'center',
   },
-  headline: {
-    // Never truncated and never ellipsised: if a width genuinely cannot hold a
-    // sentence it wraps, which is the last resort rather than the mechanism.
+  /**
+   * The two flexible spaces. They grow to fill whatever height is left over
+   * and shrink to `minHeight` when there is none, which is how a short screen
+   * loses air rather than losing content.
+   */
+  space: {
+    flexGrow: 1,
     flexShrink: 1,
-    fontWeight: H.weight,
-    letterSpacing: H.letterSpacing,
-    color: H.color,
+    width: '100%',
   },
-  supporting: {
+  tagline: {
     fontWeight: '400',
-    letterSpacing: 0,
-    color: withAlpha(C.secondaryText, 0.86),
-    maxWidth: 330,
+    letterSpacing: W.taglineTracking,
+    lineHeight: 18,
+    textAlign: 'center',
+    color: C.paleLilac,
+    opacity: 0.72,
+  },
+  /**
+   * Light rather than bold. At this size the lighter weight is what makes the
+   * proposition read as editorial rather than as app onboarding.
+   */
+  headline: {
+    fontWeight: '200',
+    letterSpacing: -0.4,
+    textAlign: 'center',
+    color: C.offWhite,
+  },
+  /** One weight throughout. No part of this sentence is emphasised. */
+  support: {
+    fontWeight: '300',
+    textAlign: 'center',
+    maxWidth: W.supportMaxWidth,
+    color: C.muted,
+  },
+  ctaBlock: {
+    width: '100%',
+  },
+  arrow: {
+    fontWeight: '500',
+    color: C.ctaLabel,
   },
 });

@@ -3,7 +3,6 @@ import {
   DURATION_RANGE,
   type CatalogueSession,
   type DurationChoice,
-  type Outcome,
   type SessionSegment,
   type TransitionKey,
 } from '@/types/elsea';
@@ -17,10 +16,17 @@ import {
  *
  * The rule, in order:
  *   1. only active sessions for the interpreted transition;
- *   2. only those inside the chosen time range;
- *   3. of those, prefer whatever this person has actually reported working;
- *   4. break ties on the longest that fits, because a session cut short by
- *      the clock is worse than one that ends early.
+ *   2. only those matching the chosen duration exactly;
+ *   3. where nothing matches exactly, take the nearest available duration,
+ *      preferring the shorter of two equally near options — a session that
+ *      runs longer than the time someone said they had is the worse miss.
+ *
+ * Deliberately no personalisation here. It used to prefer a row the person had
+ * rated well, but `sessions_catalogue` is unique on
+ * (transition_key, duration_seconds), so an exact duration identifies exactly
+ * one row: there is nothing to choose between, and the outcome query it ran on
+ * every selection could never change the result. Personalisation moved up a
+ * level, to which duration is suggested — see `@/lib/personalisation`.
  *
  * Every input is a controlled value, so the reasoning is explainable. There is
  * no score, no weighting matrix and no opaque ranking.
@@ -47,44 +53,12 @@ function toSession(row: Row): CatalogueSession {
 export type SelectionFailure = 'unconfigured' | 'network' | 'none_eligible';
 
 export type SelectionResult =
-  | { ok: true; session: CatalogueSession; personalised: boolean }
+  | { ok: true; session: CatalogueSession }
   | { ok: false; failure: SelectionFailure };
-
-/**
- * Sessions this person has reported a good outcome from, most recent first.
- *
- * Returns an empty list for anonymous users and whenever history cannot be
- * read — personalisation is an improvement on the default, never a
- * precondition for it.
- */
-async function sessionsThatWorked(userId: string | null): Promise<Set<string>> {
-  if (!userId) return new Set();
-
-  const supabase = getSupabase();
-  if (!supabase) return new Set();
-
-  const { data, error } = await supabase
-    .from('session_outcomes')
-    .select('outcome, user_sessions!inner(session_id)')
-    .eq('user_id', userId)
-    .eq('outcome', 'yes' satisfies Outcome)
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  if (error || !data) return new Set();
-
-  const ids = new Set<string>();
-  for (const row of data as unknown as { user_sessions?: { session_id?: string } }[]) {
-    const id = row.user_sessions?.session_id;
-    if (id) ids.add(id);
-  }
-  return ids;
-}
 
 export async function selectSession(
   transitionKey: TransitionKey,
-  choice: DurationChoice,
-  userId: string | null
+  choice: DurationChoice
 ): Promise<SelectionResult> {
   const supabase = getSupabase();
   if (!supabase) return { ok: false, failure: 'unconfigured' };
@@ -109,37 +83,36 @@ export async function selectSession(
     ? all.filter((s) => s.durationSeconds >= range.min && s.durationSeconds <= range.max)
     : [];
 
-  const pool = fits.length > 0 ? fits : all;
-
-  const worked = await sessionsThatWorked(userId);
-  const previouslyWorked = pool.filter((s) => worked.has(s.id));
-  if (previouslyWorked.length > 0) {
-    return {
-      ok: true,
-      session: previouslyWorked.reduce((a, b) =>
-        b.durationSeconds > a.durationSeconds ? b : a
-      ),
-      personalised: true,
-    };
-  }
-
-  // Where a time was given, take the longest that fits: a session cut short by
-  // the clock is worse than one that ends with time to spare.
-  //
-  // Where none was — "Not sure", or a range nothing falls into — take the
-  // shortest, so a session never runs longer than someone was expecting. This
-  // matches the rule the interpret Edge Function already applies when the
-  // person's text mentions no duration.
-  const longest = (a: CatalogueSession, b: CatalogueSession) =>
-    b.durationSeconds > a.durationSeconds ? b : a;
   const shortest = (a: CatalogueSession, b: CatalogueSession) =>
     b.durationSeconds < a.durationSeconds ? b : a;
 
-  return {
-    ok: true,
-    session: pool.reduce(fits.length > 0 ? longest : shortest),
-    personalised: false,
-  };
+  // An exact match: any of them will do, they are the same length.
+  if (fits.length > 0) {
+    return { ok: true, session: fits.reduce(shortest) };
+  }
+
+  // "Not sure" states no time, so it resolves to the shortest approved session
+  // — a first experience should never run longer than someone expected. This
+  // is the rule the interpret Edge Function already applies when the person's
+  // text mentions no duration.
+  if (!range) {
+    return { ok: true, session: all.reduce(shortest) };
+  }
+
+  // A time was asked for and this family has no session of that length. Take
+  // the nearest one rather than the shortest: falling back to the shortest
+  // would answer a request for twenty minutes with a three-minute session.
+  // Ties go to the shorter, so the miss is never an overrun.
+  const target = range.min;
+  const nearest = all.reduce((best, candidate) => {
+    const dBest = Math.abs(best.durationSeconds - target);
+    const dCandidate = Math.abs(candidate.durationSeconds - target);
+    if (dCandidate < dBest) return candidate;
+    if (dCandidate > dBest) return best;
+    return candidate.durationSeconds < best.durationSeconds ? candidate : best;
+  });
+
+  return { ok: true, session: nearest };
 }
 
 /** The audio segments for a session, in order. */

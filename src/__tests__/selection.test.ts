@@ -80,23 +80,22 @@ beforeEach(() => {
 });
 
 describe('session selection', () => {
-  it('picks the longest session inside the chosen range', async () => {
+  it('picks the session matching the chosen duration exactly', async () => {
     getSupabase.mockReturnValue(makeSupabase({}));
 
-    // 'medium' is 300-600 seconds.
-    const result = await selectSession('wound_up_home', 'medium', null);
+    // 'medium' is exactly 600 seconds.
+    const result = await selectSession('wound_up_home', 'medium');
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('unreachable');
     expect(result.session.durationSeconds).toBe(600);
-    expect(result.personalised).toBe(false);
   });
 
   it('never returns a session longer than the person asked for', async () => {
     getSupabase.mockReturnValue(makeSupabase({}));
 
-    // 'short' is 120-300 seconds.
-    const result = await selectSession('wound_up_home', 'short', null);
+    // 'short' is exactly 300 seconds.
+    const result = await selectSession('wound_up_home', 'short');
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('unreachable');
@@ -106,7 +105,7 @@ describe('session selection', () => {
   it('falls back to the shortest session when unsure', async () => {
     getSupabase.mockReturnValue(makeSupabase({}));
 
-    const result = await selectSession('wound_up_home', 'unsure', null);
+    const result = await selectSession('wound_up_home', 'unsure');
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('unreachable');
@@ -114,22 +113,58 @@ describe('session selection', () => {
     expect(result.session.durationSeconds).toBe(300);
   });
 
-  it('prefers a session the person has said worked', async () => {
-    getSupabase.mockReturnValue(makeSupabase({ workedSessionIds: ['s420'] }));
+  it('takes the nearest duration when the family has no session of that length', async () => {
+    getSupabase.mockReturnValue(makeSupabase({}));
 
-    // 420 is not the longest in 'long', but it is the one that worked.
-    const result = await selectSession('wound_up_home', 'medium', 'user-1');
+    // Nothing is 1200s here; 900 is nearest. The point of this test is that it
+    // is NOT 300 — falling back to the shortest would answer a request for
+    // twenty minutes with a five-minute session.
+    const result = await selectSession('wound_up_home', 'extended');
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('unreachable');
-    expect(result.session.id).toBe('s420');
-    expect(result.personalised).toBe(true);
+    expect(result.session.durationSeconds).toBe(900);
+  });
+
+  it('breaks a tie on nearest toward the shorter session', async () => {
+    getSupabase.mockReturnValue(
+      makeSupabase({
+        catalogue: [
+          { id: 'a', transition_key: 'wound_up_home', duration_seconds: 300, intensity: 2, requires_headphones: false },
+          { id: 'b', transition_key: 'wound_up_home', duration_seconds: 900, intensity: 2, requires_headphones: false },
+        ],
+      })
+    );
+
+    // 600 is equidistant from 300 and 900. Overrunning the stated time is the
+    // worse miss, so the shorter wins.
+    const result = await selectSession('wound_up_home', 'medium');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('unreachable');
+    expect(result.session.durationSeconds).toBe(300);
+  });
+
+  it('is deterministic — the same transition and duration always give the same session', async () => {
+    // Selection carries no personalisation and no user. `sessions_catalogue`
+    // is unique on (transition_key, duration_seconds), so these two inputs
+    // identify one row and nothing else can influence it. Personalisation now
+    // acts a level up, on which duration is suggested.
+    getSupabase.mockReturnValue(makeSupabase({}));
+    const first = await selectSession('wound_up_home', 'medium');
+
+    getSupabase.mockReturnValue(makeSupabase({}));
+    const second = await selectSession('wound_up_home', 'medium');
+
+    expect(first).toEqual(second);
+    if (!first.ok) throw new Error('unreachable');
+    expect(first.session.durationSeconds).toBe(600);
   });
 
   it('reports rather than invents when nothing is eligible', async () => {
     getSupabase.mockReturnValue(makeSupabase({ catalogue: [] }));
 
-    const result = await selectSession('wound_up_home', 'medium', null);
+    const result = await selectSession('wound_up_home', 'medium');
 
     expect(result).toEqual({ ok: false, failure: 'none_eligible' });
   });
@@ -137,20 +172,12 @@ describe('session selection', () => {
   it('reports a network failure rather than guessing', async () => {
     getSupabase.mockReturnValue(makeSupabase({ catalogueError: true }));
 
-    const result = await selectSession('wound_up_home', 'medium', null);
+    const result = await selectSession('wound_up_home', 'medium');
 
     expect(result).toEqual({ ok: false, failure: 'network' });
   });
 
-  it('works signed out, without personalisation', async () => {
-    getSupabase.mockReturnValue(makeSupabase({ workedSessionIds: ['s420'] }));
 
-    const result = await selectSession('wound_up_home', 'medium', null);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error('unreachable');
-    expect(result.personalised).toBe(false);
-  });
 });
 
 describe('patterns', () => {

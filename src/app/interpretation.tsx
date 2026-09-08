@@ -15,6 +15,11 @@ const C = ElseaS02Color;
 /**
  * SCREEN 04 — WE UNDERSTOOD.
  *
+ * NO LONGER ON THE MAIN PATH. Target + time absorbed the confirm step, so the
+ * gate routes straight there. Left in place rather than deleted: it is built
+ * and reviewed, and its readback is the only place the interpretation is put
+ * into words. Nothing navigates to it today.
+ *
  * ELSEA says back what it thinks is happening, in ordinary language, and the
  * person says whether that is right.
  *
