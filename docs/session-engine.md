@@ -48,12 +48,13 @@ measurable from data rather than estimated from a spreadsheet.
 
 ```
 free text / shortcut
-  -> SAFETY GATE            (server-side, fail closed)
-  -> INTERPRETATION         (structured state only)
-  -> DECISION ENGINE        (pick one of five canonical recipes)
-  -> PERSONALISATION        (effectiveness data for this person)
-  -> SESSION MANIFEST       (ordered segment references + budget audit)
-  -> CLIENT COMPOSES        (sequencing, beds, crossfades, silence)
+  -> SAFETY GATE            server-side, fail closed   (functions/interpret)
+  -> INTERPRETATION         structured state only
+  -> DECISION ENGINE        five canonical recipes     (functions/compose)
+  -> PERSONALISATION        effectiveness data
+  -> BUDGET                 enforced where the provider can be called
+  -> SESSION MANIFEST       references + resolved paths + budget audit
+  -> CLIENT PLAYS           sequencing, beds, ducking, fades, silence
 ```
 
 ## Data model
@@ -160,21 +161,26 @@ These are properties of the system, enforced in code and covered by tests.
 Stated plainly so it is not mistaken for finished work.
 
 - **No audio content exists.** The library is a schema with no rows.
-- **The multi-segment player exists but nothing drives it yet.**
-  `src/audio/use-manifest-player.ts` sequences cues across two alternating
-  players, runs the bed underneath, ducks it under speech, plays composed
-  silence and reports phase progress. It is not wired into `session.tsx`,
-  because `compose()` cannot produce a manifest until `recipe_phases` and
-  `intervention_modules` have rows. The old single-segment
-  `use-session-audio.ts` still serves the live catalogue path.
+- **The player is wired but never activates.** `session.tsx` runs both engines
+  behind one shape: the composer takes over only when it returns a complete
+  manifest, and it cannot, because `intervention_modules` is empty. Every
+  session falls back to `use-session-audio.ts` and the catalogue path. The
+  recipes ARE seeded — that half is done — so modules are the only thing left
+  in the way.
 - **Edge fades, not crossfades.** Cues ramp in and out inside their own
   duration. A true crossfade overlaps neighbours, which would make playback
   finish earlier than the composed duration and drift out of step with the
   progress bar. A real crossfade requires composition to model the overlap —
   a manifest change, not a player change.
-- **No TTS provider is wired.** `src/lib/voice` defines the adapter boundary
-  and the budget; no vendor is called and no key is bundled client-side.
+- **No TTS provider is wired.** `supabase/functions/_shared/provider.ts`
+  defines the adapter boundary and `speech.ts` the budget; no vendor is called.
+  Both are server-side: no key is bundled client-side, and a budget the client
+  could skip would not be a budget.
 - **`sessions_catalogue` remains the live path**, because retiring it before
   the library has content would leave no playable session at all. There is no
   feature flag: a flag would gate a path that cannot yet produce a manifest.
-  The switch happens when recipes and modules land.
+  The switch happens on its own when approved modules land.
+- **A phase chains modules** rather than playing one and padding the rest with
+  silence (S16 re-approved). A module never repeats within a phase, which is
+  what limits how full a twenty-minute session can be. See
+  [`module-library.md`](./module-library.md).

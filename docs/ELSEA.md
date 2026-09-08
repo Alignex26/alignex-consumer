@@ -8,8 +8,9 @@ are to where they need to be.
 decided, or found to be wrong. A stale claim here is worse than no claim, so
 prefer deleting a line to leaving it out of date.
 
-Companion: [`session-engine.md`](./session-engine.md) is the architecture of
-record for composition, cost and playback. This file is the inventory and the
+Companions: [`session-engine.md`](./session-engine.md) is the architecture of
+record for composition, cost and playback; [`module-library.md`](./module-library.md)
+is the brief for the intervention library. This file is the inventory and the
 state of play.
 
 Last updated: 2026-09-08.
@@ -21,7 +22,7 @@ Last updated: 2026-09-08.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 123 passing across 7 suites |
+| Tests | 130 passing across 7 suites |
 | TypeScript | clean |
 | Lint | 1 pre-existing error in `src/hooks/use-color-scheme.web.ts` (Expo starter, web-only, untouched) |
 | Migrations | 7 written, **all applied** |
@@ -106,7 +107,9 @@ Recorded so they are not relitigated.
 - **S14** — all duration floors **provisional pending clinical review**.
   `recipe_phases.is_provisional` carries this in the data.
 - **S15** — silence is composed, never baked into a file.
-- **S16** — **any phase or planner change requires re-approval.**
+- **S16** — **any phase or planner change requires re-approval.** Granted once
+  since: a phase now chains several modules rather than playing one and padding
+  the rest with silence. See `module-library.md` §3.
 - **S4** — clinical technique content is authored and approved outside
   engineering. `intervention_modules.approved` gates it.
 
@@ -298,12 +301,13 @@ Probed, not assumed:
 - **Catalogue path intact.** `transitions` 5 rows, `sessions_catalogue` 16,
   `session_segments` 16 visible to anon.
 - **Screens 1 and 2** measured across seven frames, 320×568 to 430×950.
-- **The shared allocator resolves in the real bundler.** Not just `tsc` and
-  jest, which use babel: a full Metro bundle of the app succeeded with
-  `src/lib/compose.ts` importing
-  `supabase/functions/_shared/allocate.ts`. The 47 engine and timeline tests
-  passed unchanged across the refactor, which is the parity evidence — same
-  inputs, same manifests, one implementation.
+- **One allocator, and it does not ship.** The composer and the tests share
+  `supabase/functions/_shared/allocate.ts`; the app imports none of it. The 47
+  engine and timeline tests passed unchanged across the refactor, which is the
+  parity evidence — same inputs, same manifests, one implementation. Absence
+  from the client was confirmed by grepping a real Metro bundle rather than by
+  reading imports, because `tsc` and jest run through babel and would not
+  catch a bundler difference.
 
 - **The recipe lockdown is live.** Against the deployed database, anon reading
   `recipe_phases` gets `200 []` while the table holds 31 rows, and
@@ -389,7 +393,11 @@ Also outstanding and purely cosmetic: the target and time screen still shows
 1 and 2 but which was out of scope for that work.
 
 **The real work now: the intervention-module library.** Nothing composes until
-approved modules exist. A small, exceptional set beats hundreds of mediocre
+approved modules exist. The engineering constraints are computed and written up
+in [`module-library.md`](./module-library.md) — including two that would
+otherwise be discovered after recording: `close` needs a module of 10 seconds
+or less and `orient` one of 20 seconds or less, or no five-minute session can
+be composed at all. A small, exceptional set beats hundreds of mediocre
 ones. This is content and clinical work, not architecture — and it is where the
 experience the person actually hears gets made.
 
