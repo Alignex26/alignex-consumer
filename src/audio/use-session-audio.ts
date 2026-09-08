@@ -1,5 +1,5 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { loadSegments } from '@/lib/catalogue';
@@ -204,14 +204,19 @@ export function useSessionAudio(session: CatalogueSession | null): SessionAudio 
           ? 'paused'
           : 'idle';
 
-  return {
-    status,
-    assetMissing,
-    elapsedSeconds,
-    durationSeconds,
-    isPlaying: wantsPlay,
-    finished,
-    play,
-    pause,
-  };
+  // Memoised for the same reason as the composed player: a fresh literal each
+  // render churns the dependencies of everything downstream.
+  return useMemo(
+    () => ({
+      status,
+      assetMissing,
+      elapsedSeconds,
+      durationSeconds,
+      isPlaying: wantsPlay,
+      finished,
+      play,
+      pause,
+    }),
+    [status, assetMissing, elapsedSeconds, durationSeconds, wantsPlay, finished, play, pause]
+  );
 }

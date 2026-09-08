@@ -405,17 +405,37 @@ export function useManifestPlayer(
             ? 'paused'
             : 'idle';
 
-  return {
-    status,
-    fault,
-    elapsedSeconds: elapsed,
-    totalSeconds,
-    isPlaying: wantsPlay,
-    finished,
-    currentPhase: timeline?.cues[cueIndex]?.phase ?? null,
-    currentCueIndex: cueIndex,
-    missingCues,
-    play,
-    pause,
-  };
+  const currentPhase = timeline?.cues[cueIndex]?.phase ?? null;
+
+  // Memoised so consumers can depend on this object directly. A hook that
+  // returns a fresh literal every render silently churns the dependencies of
+  // every effect and callback downstream of it.
+  return useMemo(
+    () => ({
+      status,
+      fault,
+      elapsedSeconds: elapsed,
+      totalSeconds,
+      isPlaying: wantsPlay,
+      finished,
+      currentPhase,
+      currentCueIndex: cueIndex,
+      missingCues,
+      play,
+      pause,
+    }),
+    [
+      status,
+      fault,
+      elapsed,
+      totalSeconds,
+      wantsPlay,
+      finished,
+      currentPhase,
+      cueIndex,
+      missingCues,
+      play,
+      pause,
+    ]
+  );
 }

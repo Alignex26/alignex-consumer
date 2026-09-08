@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -10,7 +10,9 @@ import { ElseaTextAction } from '@/components/elsea/elsea-text-action';
 import { SessionCopy, TRANSITION_LABEL } from '@/constants/copy';
 import { ElseaFontScaleCap, ElseaS02Color, ElseaSize } from '@/constants/elsea';
 import { useFlowGuard } from '@/flow/use-flow-guard';
+import { useManifestPlayer } from '@/audio/use-manifest-player';
 import { useSessionAudio } from '@/audio/use-session-audio';
+import { useSessionComposition } from '@/audio/use-session-composition';
 import { useElseaLayout } from '@/layout/use-elsea-layout';
 import { track, trackScreen } from '@/lib/analytics';
 import { finishRun, startRun } from '@/lib/runs';
@@ -47,7 +49,55 @@ export default function SessionScreen() {
   const { userId } = useAuth();
   const { interpretation, selectedSession, run, setRun } = useSessionFlow();
 
-  const audio = useSessionAudio(selectedSession);
+  // ---- Which engine plays this session ------------------------------------
+  //
+  // The catalogue is still the live path. The composition engine sits behind
+  // it and takes over only when it can produce a COMPLETE manifest — today it
+  // never can, because `recipe_phases` and `intervention_modules` are empty,
+  // so every session falls back and nothing changes. It starts serving real
+  // sessions the moment the recipes and modules land, with no code change.
+  //
+  // Both hooks are called unconditionally, because hooks must be, and the
+  // unused one is handed null so it stays inert rather than loading anything.
+  const composition = useSessionComposition(
+    interpretation,
+    selectedSession?.durationSeconds ?? 0,
+    userId
+  );
+  const composed = useManifestPlayer(composition.manifest);
+  const catalogue = useSessionAudio(composition.manifest ? null : selectedSession);
+
+  // One shape, so nothing below has to know which engine is playing. The two
+  // differ in what they can report: the catalogue engine knows only whether
+  // its single asset was there, the composed one knows how many of its cues
+  // were. Both reduce to the same question for the person — is this running
+  // with no sound.
+  const audio = useMemo(
+    () =>
+      composition.manifest
+        ? {
+            status: composed.status,
+            elapsedSeconds: composed.elapsedSeconds,
+            durationSeconds: composed.totalSeconds,
+            isPlaying: composed.isPlaying,
+            finished: composed.finished,
+            silent: composed.missingCues > 0,
+            play: composed.play,
+            pause: composed.pause,
+          }
+        : {
+            status: catalogue.status,
+            elapsedSeconds: catalogue.elapsedSeconds,
+            durationSeconds: catalogue.durationSeconds,
+            isPlaying: catalogue.isPlaying,
+            finished: catalogue.finished,
+            silent: catalogue.assetMissing,
+            play: catalogue.play,
+            pause: catalogue.pause,
+          },
+    [composition.manifest, composed, catalogue]
+  );
+
   const [confirmingExit, setConfirmingExit] = useState(false);
 
   const createdRun = useRef(false);
@@ -76,10 +126,10 @@ export default function SessionScreen() {
   // ---- Start playing once there is something to play ----------------------
   const started = useRef(false);
   useEffect(() => {
-    if (started.current || audio.status === 'loading' || !ready) return;
+    if (started.current || composition.loading || audio.status === 'loading' || !ready) return;
     started.current = true;
     audio.play();
-  }, [audio, ready]);
+  }, [audio, ready, composition.loading]);
 
   const close = useCallback(
     async (status: 'completed' | 'ended_early') => {
@@ -145,7 +195,7 @@ export default function SessionScreen() {
           <Text style={styles.context} maxFontSizeMultiplier={ElseaFontScaleCap.helper}>
             {TRANSITION_LABEL[interpretation.transitionKey]}
           </Text>
-          {audio.assetMissing ? (
+          {audio.silent ? (
             <Text style={styles.assetNotice} maxFontSizeMultiplier={ElseaFontScaleCap.helper}>
               AUDIO ASSET REQUIRED — running as a timed session with no sound.
             </Text>
