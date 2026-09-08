@@ -61,7 +61,7 @@ free text / shortcut
 | Table | Purpose |
 |---|---|
 | `intervention_modules` | The library. Reusable, owned by no session. |
-| `module_affinities` | Which transition + phase a module may serve. |
+| `recipe_phase_families` | Which module families a phase accepts. The V1 eligibility mechanism. |
 | `recipe_phases` | Phase structure per transition, with duration floors. |
 | `module_effectiveness` | Per-person, per-module outcome tally (Rule 8). |
 | `generated_segments` | Three-level cache of dynamic speech (Rule 9). |
