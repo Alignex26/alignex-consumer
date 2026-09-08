@@ -676,9 +676,9 @@ export const ElseaWelcome = {
  * Only the values particular to this screen live here.
  */
 export const ElseaTargetType = {
-  narrow: { wordmark: 26, tagline: 9, brandRight: 8, heading: 31, support: 14, cardLabel: 15, cardDetail: 11, timeValue: 19, timeUnit: 10 },
-  standard: { wordmark: 29, tagline: 10, brandRight: 9, heading: 38, support: 16, cardLabel: 16, cardDetail: 12, timeValue: 21, timeUnit: 10 },
-  wide: { wordmark: 32, tagline: 11, brandRight: 10, heading: 42, support: 17, cardLabel: 17, cardDetail: 13, timeValue: 22, timeUnit: 11 },
+  narrow: { wordmark: 26, tagline: 9, heading: 31, support: 14, cardLabel: 15, cardDetail: 11, timeValue: 19, timeUnit: 10 },
+  standard: { wordmark: 29, tagline: 10, heading: 38, support: 16, cardLabel: 16, cardDetail: 12, timeValue: 21, timeUnit: 10 },
+  wide: { wordmark: 32, tagline: 11, heading: 42, support: 17, cardLabel: 17, cardDetail: 13, timeValue: 22, timeUnit: 11 },
 } as const;
 
 export const ElseaTargetSpace = {
@@ -745,8 +745,6 @@ export const ElseaTarget = {
   labelTracking: 2.4,
 } as const;
 
-/** §3 — brand language only. Not a feature. */
-export const ELSEA_BRAND_RIGHT = ['STATE', 'TRANSITION', 'INTELLIGENCE'] as const;
 
 /**
  * ENTRY REDESIGN — geometry of the two approved brand assets.

@@ -9,7 +9,6 @@ import { ElseaStateCard } from '@/components/elsea/elsea-state-card';
 import { ElseaTimeChip } from '@/components/elsea/elsea-time-chip';
 import { PRODUCT_NAME, TRADEMARK } from '@/constants/brand';
 import {
-  ELSEA_BRAND_RIGHT,
   ElseaFontScaleCap,
   ElseaTarget,
   ElseaTargetCompact,
@@ -245,7 +244,7 @@ export default function TargetAndTimeScreen() {
               paddingBottom: actionHeight + (compact ? ElseaTargetCompact.scrollBottomPad : 14),
             },
           ]}>
-          {/* Header. Brand left, brand language right. */}
+          {/* Header. The brand lockup, and nothing beside it. */}
           <View style={styles.header}>
             <View style={styles.brandLeft}>
               <View style={styles.markRow}>
@@ -268,14 +267,6 @@ export default function TargetAndTimeScreen() {
                 maxFontSizeMultiplier={ElseaFontScaleCap.helper}>
                 A BRIGHTER YOU{'\n'}ON YOUR TERMS
               </Text>
-            </View>
-
-            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-              {ELSEA_BRAND_RIGHT.map((line) => (
-                <Text key={line} style={[styles.brandRight, { fontSize: type.brandRight }]}>
-                  {line}
-                </Text>
-              ))}
             </View>
           </View>
 
@@ -410,7 +401,7 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
   spacer: { flexGrow: 1 },
 
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  header: { flexDirection: 'row', alignItems: 'flex-start' },
   brandLeft: { flexShrink: 1 },
   markRow: { alignSelf: 'flex-start' },
   mark: {
@@ -432,14 +423,6 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     color: C.paleLilac,
     opacity: 0.7,
-  },
-  brandRight: {
-    fontWeight: '500',
-    letterSpacing: T.labelTracking,
-    lineHeight: 15,
-    textAlign: 'right',
-    color: C.muted,
-    opacity: 0.8,
   },
 
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
