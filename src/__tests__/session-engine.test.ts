@@ -25,7 +25,7 @@ import type {
 
 const module_ = (over: Partial<InterventionModule> & { id: string }): InterventionModule => ({
   moduleKey: `key_${over.id}`,
-  family: 'regulation',
+  family: 'regulate',
   techniqueKey: 'unspecified',
   storagePath: `modules/${over.id}.m4a`,
   durationSeconds: 120,
@@ -52,7 +52,7 @@ const baseInput = (over: Partial<CompositionInput> = {}): CompositionInput => ({
   phases: PHASES,
   modulesByPhase: {
     regulation: [module_({ id: 'r1', durationSeconds: 150 })],
-    reframe: [module_({ id: 'c1', durationSeconds: 150, family: 'cognitive' })],
+    reframe: [module_({ id: 'c1', durationSeconds: 150, family: 'reframe' })],
   },
   ...over,
 });
@@ -411,7 +411,7 @@ describe('the manifest is playable as a timeline', () => {
   });
 
   it('runs the bed underneath as a concurrent layer for the whole session', () => {
-    const bed = module_({ id: 'bed1', family: 'bed', isBed: true, durationSeconds: 60 });
+    const bed = module_({ id: 'bed1', family: 'settle', isBed: true, durationSeconds: 60 });
     const result = compose(baseInput({ bed }));
 
     expect(result.ok).toBe(true);

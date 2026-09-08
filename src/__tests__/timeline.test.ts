@@ -37,6 +37,7 @@ const mod = (ordinal: number, offset: number, duration: number, phase = 'regulat
   durationSeconds: duration,
   moduleId: `m${ordinal}`,
   moduleKey: `key_m${ordinal}`,
+  storagePath: `modules/m${ordinal}.m4a`,
   phase,
 });
 
@@ -73,6 +74,7 @@ describe('building a timeline', () => {
       kind: 'module',
       moduleId: 'm0',
       moduleKey: 'key_m0',
+      storagePath: 'modules/m0.m4a',
     });
   });
 
@@ -85,6 +87,7 @@ describe('building a timeline', () => {
       durationSeconds: 90,
       moduleId: 'bed1',
       moduleKey: 'key_bed',
+      storagePath: 'modules/bed1.m4a',
       phase: 'bed',
     };
     const result = buildTimeline(manifest([mod(0, 0, 60), mod(1, 60, 30), bed], 90));
@@ -211,7 +214,7 @@ describe('what compose produces is always playable', () => {
     const module_ = (id: string, duration: number): InterventionModule => ({
       id,
       moduleKey: `key_${id}`,
-      family: 'regulation',
+      family: 'regulate',
       techniqueKey: 't',
       storagePath: `modules/${id}.m4a`,
       durationSeconds: duration,
@@ -237,7 +240,7 @@ describe('what compose produces is always playable', () => {
           regulation: [module_('r1', 120)],
           reframe: [module_('c1', 120)],
         },
-        bed: { ...module_('bed1', 60), family: 'bed', isBed: true },
+        bed: { ...module_('bed1', 60), family: 'settle', isBed: true },
         speech: [speechRequest(context, 'a'.repeat(charactersFor(20)))],
       });
 

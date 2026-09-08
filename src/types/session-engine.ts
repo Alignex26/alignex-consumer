@@ -11,16 +11,20 @@ import type { StateCurrent, StateTarget, TransitionKey } from '@/types/elsea';
  * apart so a change can never quietly move cost from the first into the second.
  */
 
-/** Module families. `bed` is a background layer, not a foreground technique. */
-export const MODULE_FAMILIES = [
-  'regulation',
-  'cognitive',
-  'activation',
-  'transition',
-  'bed',
-] as const;
+/**
+ * The twelve approved product-level families.
+ *
+ * Re-exported from the shared allocator rather than restated, so the app, the
+ * server-side composer and the tests all read one list. Canonical form is
+ * lower case, like every other identifier in the schema; upper case is a
+ * display treatment only and never reaches the database or the domain model.
+ *
+ * `bed` is not a family. A bed is a LAYER, marked by `isBed`, and still
+ * belongs to one of the twelve.
+ */
+import type { ModuleFamily } from '../../supabase/functions/_shared/allocate';
 
-export type ModuleFamily = (typeof MODULE_FAMILIES)[number];
+export { MODULE_FAMILIES, type ModuleFamily } from '../../supabase/functions/_shared/allocate';
 
 /** A reusable piece of library audio. Generated or produced once, played forever. */
 export type InterventionModule = {
@@ -84,6 +88,12 @@ export type ManifestSegment =
       durationSeconds: number;
       moduleId: string;
       moduleKey: string;
+      /**
+       * Resolved by the server-side composer, so the client never reads
+       * `intervention_modules` — that table is proprietary and service-role
+       * only.
+       */
+      storagePath: string;
       phase: string;
     }
   | {

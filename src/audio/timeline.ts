@@ -16,7 +16,7 @@ import type { SessionManifest, SpeechSlot } from '@/types/session-engine';
 
 /** What a cue plays. `silence` plays nothing and is composed, never a file. */
 export type CueSource =
-  | { kind: 'module'; moduleId: string; moduleKey: string }
+  | { kind: 'module'; moduleId: string; moduleKey: string; storagePath: string }
   | { kind: 'generated'; cacheKey: string; slot: SpeechSlot }
   | { kind: 'silence' };
 
@@ -36,6 +36,7 @@ export type TimelineCue = {
 export type TimelineBed = {
   moduleId: string;
   moduleKey: string;
+  storagePath: string;
   durationSeconds: number;
 };
 
@@ -122,7 +123,12 @@ export function buildTimeline(manifest: SessionManifest): TimelineResult {
 
     let source: CueSource;
     if (segment.kind === 'module') {
-      source = { kind: 'module', moduleId: segment.moduleId, moduleKey: segment.moduleKey };
+      source = {
+        kind: 'module',
+        moduleId: segment.moduleId,
+        moduleKey: segment.moduleKey,
+        storagePath: segment.storagePath,
+      };
     } else if (segment.kind === 'generated') {
       source = {
         kind: 'generated',
@@ -159,6 +165,7 @@ export function buildTimeline(manifest: SessionManifest): TimelineResult {
       ? {
           moduleId: bedSegment.moduleId,
           moduleKey: bedSegment.moduleKey,
+          storagePath: bedSegment.storagePath,
           durationSeconds: bedSegment.durationSeconds,
         }
       : null;

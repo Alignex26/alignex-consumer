@@ -1,0 +1,23 @@
+-- Remove `module_affinities`.
+--
+-- It was created in `20260908120000_session_engine`, which has been applied, so
+-- that file is not edited. This is a separate migration, as it has to be.
+--
+-- WHY IT GOES. `recipe_phase_families` is the V1 eligibility mechanism: a phase
+-- accepts certain module families, and an approved module of an eligible family
+-- can fill it. `module_affinities` said something overlapping and less precise —
+-- that a specific module belongs to a specific phase — and nothing ever
+-- selected on it. Two ways to answer one question is one too many, and a vague
+-- table kept "in case" becomes accidental architecture: the next person to read
+-- the schema cannot tell which one decides.
+--
+-- It is empty, so nothing is lost. Should a per-module clinical override ever
+-- be needed — this particular regulate module is permitted in `nervous_ready`
+-- but never in `wired_sleep` — that is a product decision, and it will get an
+-- explicit construct with explicit semantics at the time. Not a generic
+-- "affinity" preserved on the chance it turns out to mean something.
+--
+-- REVERSIBILITY. Destructive, but only of an empty, unreferenced table. The
+-- creating migration still holds its definition if it is ever wanted back.
+
+drop table if exists module_affinities;

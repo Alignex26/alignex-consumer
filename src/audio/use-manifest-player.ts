@@ -131,30 +131,14 @@ async function publicUrl(storagePath: string): Promise<string | null> {
 export type CueResolver = (source: CueSource) => Promise<string | null>;
 
 const defaultResolver: CueResolver = async (source) => {
-  if (source.kind === 'silence') return null;
+  // Module paths arrive already resolved on the manifest, because the composer
+  // runs server-side and `intervention_modules` is no longer readable from a
+  // client. Nothing here queries a proprietary table.
+  if (source.kind === 'module') return publicUrl(source.storagePath);
 
-  const supabase = getSupabase();
-  if (!supabase) return null;
-
-  try {
-    if (source.kind === 'module') {
-      const { data } = await supabase
-        .from('intervention_modules')
-        .select('storage_path')
-        .eq('id', source.moduleId)
-        .maybeSingle();
-      return data?.storage_path ? publicUrl(data.storage_path) : null;
-    }
-
-    const { data } = await supabase
-      .from('generated_segments')
-      .select('storage_path')
-      .eq('cache_key', source.cacheKey)
-      .maybeSingle();
-    return data?.storage_path ? publicUrl(data.storage_path) : null;
-  } catch {
-    return null;
-  }
+  // Generated speech has no path yet: no provider is wired, so nothing is ever
+  // synthesised. When it is, the composer will carry the path the same way.
+  return null;
 };
 
 export function useManifestPlayer(
@@ -220,6 +204,7 @@ export function useManifestPlayer(
             kind: 'module',
             moduleId: timeline.bed.moduleId,
             moduleKey: timeline.bed.moduleKey,
+            storagePath: timeline.bed.storagePath,
           })
         : null;
 

@@ -1,150 +1,147 @@
-import { compose } from '@/lib/compose';
 import { getSupabase } from '@/lib/supabase';
 import type { TransitionKey } from '@/types/elsea';
 import type {
+  CompositionFailure,
   CompositionResult,
-  InterventionModule,
-  ModuleEffectiveness,
-  RecipePhase,
-  SpeechRequest,
+  ManifestSegment,
+  SessionManifest,
 } from '@/types/session-engine';
 
 /**
- * Loading what `compose` needs, and composing.
+ * Asking the server to compose a session.
  *
- * The seam between the database and the pure engine. Everything here is
- * fetching and shape-mapping; every decision about what a session contains
- * happens in `compose`, which is why that stays testable without any of this.
+ * WHAT MOVED, AND WHY. Composition used to happen here, on the device, by
+ * reading `recipe_phases` and the module tables with the public anon key.
+ * That exposed the five recipes and their eligibility rules — ELSEA's
+ * proprietary product intelligence — to anyone who pulled the key out of the
+ * app bundle. Those tables are now service-role only, and the decision is made
+ * in the `compose` Edge Function.
  *
- * TODAY THIS ALWAYS FAILS, and that is correct. `recipe_phases` and
- * `intervention_modules` are live and empty, so the result is `no_recipe` or
- * `library_empty` and the caller falls back to the catalogue path. It starts
- * succeeding the moment the five recipes and their modules land, with no code
- * change — which is the point of wiring it now rather than later.
+ * Profitability rule 6 is unchanged: PLAYBACK composition is still client-side,
+ * in `use-manifest-player.ts`. It is the DECISION that is server-side.
+ *
+ * This module is now transport and shape-mapping only. It contains no product
+ * logic, which is the point — there is nothing here worth reverse-engineering.
  */
 
-type ModuleRow = {
-  id: string;
-  module_key: string;
-  family: string;
-  technique_key: string;
-  storage_path: string;
+/** The wire shape. Deliberately explicit rather than a structural cast. */
+type WireSegment = {
+  kind: 'module' | 'generated' | 'silence';
+  ordinal: number;
+  layer: 'foreground' | 'bed';
+  offset_seconds: number;
   duration_seconds: number;
-  intensity: number;
-  requires_headphones: boolean;
-  is_bed: boolean;
+  module_id?: string;
+  module_key?: string;
+  storage_path?: string;
+  phase?: string;
 };
 
-function toModule(row: ModuleRow): InterventionModule {
-  return {
-    id: row.id,
-    moduleKey: row.module_key,
-    family: row.family as InterventionModule['family'],
-    techniqueKey: row.technique_key,
-    storagePath: row.storage_path,
-    durationSeconds: row.duration_seconds,
-    intensity: row.intensity,
-    requiresHeadphones: row.requires_headphones,
-    isBed: row.is_bed,
-  };
+type WireResponse =
+  | {
+      ok: true;
+      manifest: {
+        transition_key: string;
+        duration_seconds: number;
+        recipe_version: number;
+        dynamic_seconds: number;
+        segments: WireSegment[];
+      };
+    }
+  | { ok: false; failure: string };
+
+const FAILURES: CompositionFailure[] = [
+  'no_recipe',
+  'library_empty',
+  'phase_unfilled',
+  'budget_exceeded',
+  'duration_unreachable',
+];
+
+function asFailure(value: string): CompositionFailure {
+  return (FAILURES as string[]).includes(value)
+    ? (value as CompositionFailure)
+    : 'library_empty';
 }
 
 /**
- * Composes a session for this person.
+ * Maps a wire segment onto the domain type.
  *
- * `speech` is empty by default and nothing here fills it. Dynamic narration
- * needs a provider, which is a decision that has not been made, and it must be
- * generated server-side where the key lives. An empty list composes a session
- * entirely from reusable content that bills nothing — the correct default, and
- * the one the guardrails already enforce.
+ * Returns null for anything malformed rather than coercing it. A segment that
+ * arrives without the fields its kind requires would otherwise become a cue
+ * the player cannot resolve, and the failure would surface much later as
+ * silence nobody can explain.
  */
+function toSegment(wire: WireSegment): ManifestSegment | null {
+  const base = {
+    ordinal: wire.ordinal,
+    layer: wire.layer,
+    offsetSeconds: wire.offset_seconds,
+    durationSeconds: wire.duration_seconds,
+  };
+
+  if (wire.kind === 'module') {
+    if (!wire.module_id || !wire.module_key || !wire.storage_path) return null;
+    return {
+      ...base,
+      kind: 'module',
+      moduleId: wire.module_id,
+      moduleKey: wire.module_key,
+      storagePath: wire.storage_path,
+      phase: wire.phase ?? '',
+    };
+  }
+
+  if (wire.kind === 'silence') {
+    return { ...base, kind: 'silence', phase: wire.phase ?? '' };
+  }
+
+  // Generated speech is not produced yet. When it is, it arrives with its own
+  // resolved path and this is where it will be mapped.
+  return null;
+}
+
 export async function loadComposition(
   transitionKey: TransitionKey,
   durationSeconds: number,
-  userId: string | null,
-  speech: readonly SpeechRequest[] = []
+  _userId: string | null
 ): Promise<CompositionResult> {
   const supabase = getSupabase();
   if (!supabase) return { ok: false, failure: 'library_empty' };
 
   try {
-    // Modules reach this screen only through an affinity row, so a module can
-    // never drift into a recipe it was not approved for. RLS already limits
-    // the join to approved, active modules.
-    const [phasesResult, affinityResult] = await Promise.all([
-      supabase
-        .from('recipe_phases')
-        .select('transition_key, ordinal, phase, min_seconds, max_seconds, is_provisional')
-        .eq('transition_key', transitionKey)
-        .order('ordinal', { ascending: true }),
-      supabase
-        .from('module_affinities')
-        .select('phase, intervention_modules(*)')
-        .eq('transition_key', transitionKey),
-    ]);
-
-    const phases: RecipePhase[] = (phasesResult.data ?? []).map((row) => ({
-      transitionKey: row.transition_key as TransitionKey,
-      ordinal: row.ordinal,
-      phase: row.phase,
-      minSeconds: row.min_seconds,
-      maxSeconds: row.max_seconds,
-      isProvisional: row.is_provisional,
-    }));
-
-    if (phases.length === 0) return { ok: false, failure: 'no_recipe' };
-
-    const modulesByPhase: Record<string, InterventionModule[]> = {};
-    let bed: InterventionModule | null = null;
-
-    for (const row of affinityResult.data ?? []) {
-      // PostgREST returns the embedded row as an object or a single-element
-      // array depending on how it infers the relationship; both are handled
-      // rather than assumed.
-      const embedded = row.intervention_modules;
-      const moduleRow = (Array.isArray(embedded) ? embedded[0] : embedded) as ModuleRow | null;
-      if (!moduleRow) continue;
-
-      const module_ = toModule(moduleRow);
-
-      // A bed is a layer, not a step in the sequence, so it never joins the
-      // phase candidates it would otherwise compete in.
-      if (module_.isBed) {
-        bed = bed ?? module_;
-        continue;
-      }
-
-      (modulesByPhase[row.phase] ??= []).push(module_);
-    }
-
-    // Personalisation is a tally, not a model, and it is optional: someone
-    // signed out simply composes without it.
-    let effectiveness: ModuleEffectiveness[] = [];
-    if (userId) {
-      const { data } = await supabase
-        .from('module_effectiveness')
-        .select('module_id, positive, total')
-        .eq('user_id', userId);
-
-      effectiveness = (data ?? []).map((row) => ({
-        moduleId: row.module_id,
-        positive: row.positive,
-        total: row.total,
-      }));
-    }
-
-    return compose({
-      transitionKey,
-      durationSeconds,
-      phases,
-      modulesByPhase,
-      bed,
-      effectiveness,
-      speech,
+    // The person's identity travels in the session token that supabase-js
+    // attaches, never in the body. A caller must not be able to compose using
+    // somebody else's effectiveness history by naming them.
+    const { data, error } = await supabase.functions.invoke<WireResponse>('compose', {
+      body: { transition_key: transitionKey, duration_seconds: durationSeconds },
     });
+
+    if (error || !data) return { ok: false, failure: 'library_empty' };
+    if (!data.ok) return { ok: false, failure: asFailure(data.failure) };
+
+    const segments = data.manifest.segments
+      .map(toSegment)
+      .filter((s): s is ManifestSegment => s !== null);
+
+    // A manifest missing segments is not a manifest. Falling back to the
+    // catalogue is far better than playing a session with holes in it.
+    if (segments.length !== data.manifest.segments.length) {
+      return { ok: false, failure: 'library_empty' };
+    }
+
+    const manifest: SessionManifest = {
+      transitionKey: data.manifest.transition_key as TransitionKey,
+      durationSeconds: data.manifest.duration_seconds,
+      recipeVersion: data.manifest.recipe_version,
+      dynamicSeconds: data.manifest.dynamic_seconds,
+      segments,
+    };
+
+    return { ok: true, manifest };
   } catch {
-    // A failure to load is not a failure to compose, but the caller only needs
-    // to know it cannot use the engine path.
+    // A failure to reach the composer is not a failure to compose, but the
+    // caller only needs to know it cannot use the engine path.
     return { ok: false, failure: 'library_empty' };
   }
 }
