@@ -1,3 +1,4 @@
+import { fillPhase } from '../../supabase/functions/_shared/allocate';
 import { compose, type CompositionInput } from '../../supabase/functions/_shared/compose';
 import {
   DynamicBudget,
@@ -244,6 +245,103 @@ describe('Rule 8 — personalisation is effectiveness data', () => {
     const result = compose(baseInput({ effectiveness: undefined }));
 
     expect(result.ok).toBe(true);
+  });
+});
+
+
+describe('a phase chains modules rather than padding with silence', () => {
+  // The change this exists for. One module per phase meant the leftover became
+  // silence, and at twenty minutes the leftovers are enormous — a long session
+  // came out roughly a third to a half silence. Chaining keeps modules small
+  // and reusable instead of forcing 400-second recordings.
+  const scores = new Map<string, number>();
+
+  const m = (id: string, durationSeconds: number) => ({
+    id,
+    moduleKey: `key_${id}`,
+    storagePath: `modules/${id}.m4a`,
+    durationSeconds,
+  });
+
+  it('fills a long slot with several modules', () => {
+    const chosen = fillPhase([m('a', 120), m('b', 100), m('c', 90)], 400, scores);
+
+    expect(chosen.map((x) => x.id)).toEqual(['a', 'b', 'c']);
+    expect(chosen.reduce((n, x) => n + x.durationSeconds, 0)).toBe(310);
+  });
+
+  it('never repeats a module inside one phase', () => {
+    // Hearing the same technique twice in a row is a content judgement, not an
+    // engineering one, so the conservative choice is taken: when the eligible
+    // modules run out the rest of the phase is silence.
+    const chosen = fillPhase([m('only', 60)], 400, scores);
+
+    expect(chosen.map((x) => x.id)).toEqual(['only']);
+  });
+
+  it('takes nothing when nothing fits', () => {
+    expect(fillPhase([m('long', 500)], 120, scores)).toEqual([]);
+  });
+
+  it('prefers what this person rates well, then fills round it', () => {
+    // Rule 8 still leads: the best-rated module is taken first even though a
+    // longer one would pack tighter.
+    const rated = new Map([
+      ['good', 1],
+      ['meh', 0],
+    ]);
+    const chosen = fillPhase([m('meh', 200), m('good', 90), m('other', 80)], 300, rated);
+
+    expect(chosen[0].id).toBe('good');
+  });
+
+  it('is deterministic', () => {
+    const pool = [m('a', 120), m('b', 100), m('c', 90)];
+    expect(fillPhase(pool, 400, scores)).toEqual(fillPhase(pool, 400, scores));
+  });
+
+  it('cuts the silence a long session used to be padded with', () => {
+    // The measurable point, stated as a comparison rather than a magic number.
+    // `stabilise_attention` is allocated 402s at twenty minutes. One 120s
+    // module left 282s of silence — most of the phase. Three modules leave 92s.
+    const pool = [m('a', 120), m('b', 100), m('c', 90)];
+    const SLOT = 402;
+
+    const chained = fillPhase(pool, SLOT, scores);
+    const chainedSilence = SLOT - chained.reduce((n, x) => n + x.durationSeconds, 0);
+    const singleSilence = SLOT - pool[0].durationSeconds;
+
+    expect(chained).toHaveLength(3);
+    expect(chainedSilence).toBe(92);
+    expect(singleSilence).toBe(282);
+    expect(chainedSilence).toBeLessThan(singleSilence / 2);
+  });
+
+  it('composes a long session with several modules in one phase', () => {
+    const result = compose(
+      baseInput({
+        durationSeconds: 1200,
+        phases: [phase(0, 'regulation', 60, 600)],
+        modulesByPhase: {
+          regulation: [
+            module_({ id: 'r1', durationSeconds: 200 }),
+            module_({ id: 'r2', durationSeconds: 180 }),
+            module_({ id: 'r3', durationSeconds: 150 }),
+          ],
+        },
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('unreachable');
+
+    const modules = result.manifest.segments.filter((s) => s.kind === 'module');
+    const silence = result.manifest.segments
+      .filter((s) => s.kind === 'silence')
+      .reduce((n, s) => n + s.durationSeconds, 0);
+
+    expect(modules).toHaveLength(3);
+    expect(silence).toBeLessThan(100);
   });
 });
 

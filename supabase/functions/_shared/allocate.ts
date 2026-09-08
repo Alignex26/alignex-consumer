@@ -140,8 +140,60 @@ export function scoresFrom(
 }
 
 /**
+ * Fills a phase with as many approved modules as its allocation holds.
+ *
+ * WHY CHAINING EXISTS. One module per phase meant the leftover became silence,
+ * and at twenty minutes the leftovers are enormous: `stabilise_attention` is
+ * allocated 402s, `build_readiness` 400s. With modules around 180s that made a
+ * long session roughly a third silence, and around 120s roughly half. The way
+ * out was either to commission 400-second recordings — expensive, and a
+ * 400-second module is far less reusable than four 100-second ones — or to let
+ * a phase play several. Chaining keeps modules small, reusable and cheap,
+ * which is the whole economic thesis.
+ *
+ * NO MODULE REPEATS WITHIN A PHASE. Hearing the same technique twice in a row
+ * is a content judgement, not an engineering one, so the conservative choice is
+ * taken: when the eligible modules are exhausted the rest of the phase is
+ * silence. If repetition turns out to be acceptable, that is a product decision
+ * and this is the one place it would change.
+ *
+ * NOT OPTIMAL PACKING, DELIBERATELY. Modules are taken best-rated first, then
+ * longest, which can leave more silence than a perfect fit would: given a 400s
+ * slot and modules of 250s, 200s and 180s, this takes the 250 and stops, where
+ * 200 + 180 would have packed tighter. Rule 8 says the person hears what works
+ * for them; squeezing out the last seconds of silence is worth less than that,
+ * and a packing algorithm nobody can predict is worth less still.
+ */
+export function fillPhase(
+  candidates: readonly PlanModule[],
+  allocatedSeconds: number,
+  scores: ReadonlyMap<string, number>
+): PlanModule[] {
+  const chosen: PlanModule[] = [];
+  const used = new Set<string>();
+  let remaining = allocatedSeconds;
+
+  // Bounded by the candidate list: every iteration either takes a module out
+  // of contention or stops.
+  while (remaining > 0) {
+    const next = pick(
+      candidates.filter((m) => !used.has(m.id)),
+      remaining,
+      scores
+    );
+    if (!next) break;
+
+    chosen.push(next);
+    used.add(next.id);
+    remaining -= next.durationSeconds;
+  }
+
+  return chosen;
+}
+
+/**
  * The whole phase plan: allocation, selection, and the silence that fills what
- * a chosen module does not use.
+ * the chosen modules do not use.
  *
  * Returns positions relative to the start of the phase sequence. The caller
  * adds any speech around it and offsets accordingly, because speech is the one
@@ -163,22 +215,29 @@ export function planPhases(
   for (let i = 0; i < phases.length; i += 1) {
     const phase = phases[i];
     const seconds = allocation[i];
-    const chosen = pick(candidatesByPhase(phase.phase), seconds, scores);
-    if (!chosen) return { ok: false, failure: 'phase_unfilled' };
+    const chosen = fillPhase(candidatesByPhase(phase.phase), seconds, scores);
 
-    segments.push({
-      kind: 'module',
-      phase: phase.phase,
-      offsetSeconds: offset,
-      durationSeconds: chosen.durationSeconds,
-      module: chosen,
-    });
-    offset += chosen.durationSeconds;
+    // A phase nothing fits cannot be filled at all. Better no session than one
+    // with an unapproved or empty phase in the middle of it.
+    if (chosen.length === 0) return { ok: false, failure: 'phase_unfilled' };
 
-    // Whatever the phase was allocated but the module did not use becomes
+    let spent = 0;
+    for (const module of chosen) {
+      segments.push({
+        kind: 'module',
+        phase: phase.phase,
+        offsetSeconds: offset,
+        durationSeconds: module.durationSeconds,
+        module,
+      });
+      offset += module.durationSeconds;
+      spent += module.durationSeconds;
+    }
+
+    // Whatever the phase was allocated but its modules did not use becomes
     // composed silence attributed to that phase (S15) — never a mystery gap,
     // and never baked into an audio file.
-    const remainder = seconds - chosen.durationSeconds;
+    const remainder = seconds - spent;
     if (remainder > 0) {
       segments.push({
         kind: 'silence',
