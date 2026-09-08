@@ -1,5 +1,5 @@
-import { checkBudget } from '@/lib/voice/budget';
-import type { TransitionKey } from '@/types/elsea';
+import { planPhases, scoresFrom } from './allocate.ts';
+import { checkBudget } from './speech.ts';
 import type {
   CompositionFailure,
   CompositionResult,
@@ -8,13 +8,7 @@ import type {
   ModuleEffectiveness,
   RecipePhase,
   SpeechRequest,
-} from '@/types/session-engine';
-
-// The ONE implementation of the allocation and selection algorithm, shared
-// with the Deno Edge Function that composes server-side. There is no second
-// copy. See that file's header: it must stay dependency-free, or the sharing
-// breaks and the duplication comes back.
-import { planPhases, scoresFrom } from '../../supabase/functions/_shared/allocate';
+} from './types.ts';
 
 /**
  * The composition engine.
@@ -28,14 +22,15 @@ import { planPhases, scoresFrom } from '../../supabase/functions/_shared/allocat
  * testable without a database, a network or a clock, and the same inputs
  * always give the same manifest.
  *
- * NOTE ON WHERE THIS RUNS. In production the decision is made server-side, in
- * `supabase/functions/compose`, because the recipes are proprietary and the
- * budget must be enforced where the paid provider can actually be called. This
- * module is the same algorithm, kept importable and directly testable.
+ * SERVER-SIDE ONLY. This is the decision engine, and it must never ship to a
+ * device: the recipes it reads are proprietary, and a budget the client could
+ * skip is not a budget. The app calls the `compose` Edge Function and receives
+ * a finished manifest. Tests import this directly, which costs the client
+ * nothing because tests are not bundled.
  */
 
 export type CompositionInput = {
-  transitionKey: TransitionKey;
+  transitionKey: string;
   /** What the person said they had. */
   durationSeconds: number;
   recipeVersion?: number;

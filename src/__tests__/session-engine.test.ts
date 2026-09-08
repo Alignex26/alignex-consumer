@@ -1,4 +1,4 @@
-import { compose, type CompositionInput } from '@/lib/compose';
+import { compose, type CompositionInput } from '../../supabase/functions/_shared/compose';
 import {
   DynamicBudget,
   charactersFor,
@@ -7,12 +7,12 @@ import {
   intensityBand,
   speechCacheKey,
   speechRequest,
-} from '@/lib/voice/budget';
+} from '../../supabase/functions/_shared/speech';
 import type {
   InterventionModule,
   RecipePhase,
   SpeechContext,
-} from '@/types/session-engine';
+} from '../../supabase/functions/_shared/types';
 
 /**
  * The eight locked rules, as executable invariants.

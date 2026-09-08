@@ -9,7 +9,7 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 
-import { MODULE_FAMILIES } from '../../supabase/functions/_shared/allocate';
+import { MODULE_FAMILIES } from '../../supabase/functions/_shared/types';
 import { TRANSITION_KEYS } from '@/types/elsea';
 
 /**
@@ -205,6 +205,19 @@ describe('family eligibility', () => {
   });
 });
 
+/**
+ * Every `import`/`export ... from '..._shared...'` statement, whole.
+ *
+ * Matched as a STATEMENT rather than a line: a multi-line
+ * `export type { A, B } from '...'` ends on a line that mentions
+ * `_shared` but does not start with `export type`, which a line-based
+ * check reads as a violation. It found exactly that on the first run.
+ */
+const SHARED_STATEMENT = /(?:import|export)[\s\S]*?from\s*['\"][^'\"]*_shared[^'\"]*['\"]/g;
+
+/** `import type` / `export type` are erased by babel and ship nothing. */
+const TYPE_ONLY = /^(?:import|export)\s+type\b/;
+
 describe('the proprietary tables stay off the client', () => {
   const PROPRIETARY = [
     'recipe_phases',
@@ -232,6 +245,33 @@ describe('the proprietary tables stay off the client', () => {
       for (const table of PROPRIETARY) {
         expect(text).not.toContain(`.from('${table}')`);
         expect(text).not.toContain(`.from("${table}")`);
+      }
+    }
+  });
+
+  it('never imports the decision engine into client code', () => {
+    // THE RUNTIME BOUNDARY. The allocator, the selection rules, the recipes
+    // vocabulary and the speech budget all live server-side and must not ship
+    // to a device. A `import type` is fine — babel erases it and nothing is
+    // bundled — but a value import would silently pull the whole engine in.
+    //
+    // This is not hypothetical: `src/types/session-engine.ts` briefly carried
+    // `export { MODULE_FAMILIES }`, a value re-export, and only escaped
+    // shipping because every production importer happened to use `import
+    // type`. One ordinary import in a screen would have shipped it.
+    const production = sources.filter((f) => !f.includes('__tests__'));
+
+    for (const file of production) {
+      const source = readFileSync(file, 'utf8');
+
+      for (const statement of source.match(SHARED_STATEMENT) ?? []) {
+        const collapsed = statement.replace(/\s+/g, ' ').trim();
+
+        // The offending statement is named in the failure, so it is
+        // obvious rather than hunted for.
+        expect(`${file}: ${TYPE_ONLY.test(collapsed) ? 'ok' : collapsed}`).toBe(
+          `${file}: ok`
+        );
       }
     }
   });

@@ -1,13 +1,13 @@
 import { buildTimeline, cueAt, edgeGain, nextCue } from '@/audio/timeline';
-import { compose } from '@/lib/compose';
-import { charactersFor, speechRequest } from '@/lib/voice/budget';
+import { compose } from '../../supabase/functions/_shared/compose';
+import { charactersFor, speechRequest } from '../../supabase/functions/_shared/speech';
 import type {
   InterventionModule,
   ManifestSegment,
   RecipePhase,
   SessionManifest,
   SpeechContext,
-} from '@/types/session-engine';
+} from '../../supabase/functions/_shared/types';
 
 /**
  * The playable timeline.

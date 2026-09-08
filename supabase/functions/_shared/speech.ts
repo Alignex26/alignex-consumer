@@ -1,7 +1,11 @@
-import type { SpeechContext, SpeechRequest, SpeechSlot } from '@/types/session-engine';
+import type { SpeechContext, SpeechRequest, SpeechSlot } from './types.ts';
 
 /**
  * The dynamic speech budget and the cache key.
+ *
+ * SERVER-SIDE ONLY. This never ships to a device. The budget is enforced where
+ * the paid provider can actually be called, and a ceiling the client could see
+ * — or skip — is not a ceiling.
  *
  * WHY THIS IS A HARD CONSTRAINT RATHER THAN A GUIDELINE. Dynamic TTS is
  * roughly 97% of the marginal cost of a session; library audio, interpretation

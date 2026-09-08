@@ -1,4 +1,4 @@
-import type { SpeechRequest } from '@/types/session-engine';
+import type { SpeechRequest } from './types.ts';
 
 /**
  * The voice provider boundary (Rule 7).

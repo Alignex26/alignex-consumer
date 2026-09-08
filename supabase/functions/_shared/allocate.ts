@@ -2,24 +2,21 @@
 //
 // THE ONE IMPLEMENTATION OF ELSEA'S ALLOCATION AND SELECTION ALGORITHM.
 //
-// Imported by both the Expo app (`src/lib/compose.ts`) and the Deno Edge
-// Function (`supabase/functions/compose`). There is no second copy.
+// SERVER-SIDE ONLY. There is one copy, and it never ships to a device.
 //
-// WHY IT LIVES HERE. `supabase/functions/_shared` is the location the Supabase
-// CLI already treats as shared code between functions, so the deploy bundler
-// includes it without configuration. The app reaches it by ordinary relative
-// path. Metro watches the project root by default, so nothing had to be added
-// to make that resolve.
+// The production client does not import this, directly or transitively. It
+// calls the `compose` Edge Function and receives a finished manifest, so the
+// device holds no part of the decision engine — not the allocator, not the
+// selection rules, not the budget. `src/__tests__/recipes.test.ts` fails if
+// any file under `src/` imports `_shared` at runtime, and the check is a real
+// one: this is exactly the kind of boundary that erodes by accident.
+//
+// Tests import it directly, which costs the client nothing because tests are
+// not bundled.
 //
 // THE ONE RULE FOR THIS FILE: it must stay dependency-free. No React, no Expo,
-// no Supabase client, no Deno globals, no Node globals, no path aliases. The
-// moment it imports any of those, one of the two environments stops being able
-// to load it and the duplication comes back.
-//
-// Import styles differ, deliberately, and both point at this file:
-//   Deno  ->  import { planPhases } from "../_shared/allocate.ts";
-//   App   ->  import { planPhases } from '../../supabase/functions/_shared/allocate';
-// Deno requires the extension; TypeScript and Metro resolve without it.
+// no Supabase client, no Deno globals, no Node globals, no path aliases — it
+// has to load in Deno, where none of those exist.
 
 /** Below this many rated runs, one opinion would decide a module's fate. */
 export const MIN_SAMPLE = 3;
@@ -31,23 +28,8 @@ export const NEUTRAL_SCORE = 0.5;
 export const BUDGET_NORMAL_SECONDS = 30;
 export const BUDGET_CEILING_SECONDS = 45;
 
-/** The twelve approved product-level families. Canonical form is lower case. */
-export const MODULE_FAMILIES = [
-  'orient',
-  'regulate',
-  'ground',
-  'release',
-  'reframe',
-  'focus',
-  'activate',
-  'prepare',
-  'transition',
-  'settle',
-  'sleep',
-  'close',
-] as const;
-
-export type ModuleFamily = (typeof MODULE_FAMILIES)[number];
+// The family vocabulary lives in `types.ts`, which owns the domain types.
+export { MODULE_FAMILIES, type ModuleFamily } from './types.ts';
 
 export type PlanPhase = {
   phase: string;
