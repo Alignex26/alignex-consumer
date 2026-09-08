@@ -129,6 +129,14 @@ These are properties of the system, enforced in code and covered by tests.
 - **A manifest never contains a whole pre-rendered session.** Rule 2.
 - **The safety gate stays upstream of everything here.** Nothing in this engine
   may be reached from raw input without passing it.
+- **The decision engine is server-side only.** Nothing under `src/` imports
+  `supabase/functions/_shared/` at runtime. The device holds the transport, the
+  timeline and the player; it never holds the allocator, the selection rules,
+  the recipe vocabulary or the budget.
+- **Approved intervention audio must not be publicly enumerable.** Master
+  recordings are IP on the same footing as the recipes, so production manifests
+  must resolve private assets through short-lived signed URLs rather than
+  permanent public bucket paths. Not yet implemented.
 
 ## Reconciliation with earlier locked decisions
 

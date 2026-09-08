@@ -50,6 +50,14 @@ Not preferences. Breaking any is a defect, and most are enforced by tests.
 - **The recipes are private.** `recipe_phases`, `recipe_phase_families` and
   `intervention_modules` are service-role only and must never be given an anon
   policy.
+- **The decision engine never ships to a device.** Nothing under `src/` may
+  import `supabase/functions/_shared/` at runtime; type-only imports are fine
+  because they are erased. Enforced by test.
+- **Approved intervention audio must not sit in an enumerable public bucket.**
+  Master module recordings are the same class of IP as the recipes. Production
+  manifests must resolve private assets through short-lived signed URLs. This
+  will not stop a determined capture, but it prevents trivial catalogue
+  scraping. *Not yet implemented — no storage system and no audio exists.*
 - **No service-role Supabase key client-side. No provider key bundled
   client-side. No server secret in an `EXPO_PUBLIC_` variable.**
 - **Do not weaken RLS for development convenience.**
@@ -135,10 +143,16 @@ Rule 6 is intact: **playback** composition is client-side. It is the
 **decision** that is server-side. The client receives what to play and never
 learns how it was chosen.
 
-The allocation and selection algorithm itself lives in
-`supabase/functions/_shared/allocate.ts` and is imported by **both** sides.
-There is one implementation, not two — see §7 for the one part of that
-arrangement still unproven.
+**Nothing of the decision engine ships to the device.** The allocator, the
+selection rules, the recipe vocabulary and the speech budget all live under
+`supabase/functions/_shared/` and are server-side only. The app holds the
+transport, the timeline and the player, and nothing else. Verified by grepping
+a real Metro bundle, not by reading imports — see §6.
+
+The client re-exports the engine's types, but as **types only**: `export type`
+is erased by babel, so no runtime module follows them into the bundle. A value
+re-export would silently drag the whole engine across, so
+`recipes.test.ts` fails if any file under `src/` imports `_shared` at runtime.
 
 Two reasons the decision has to be server-side:
 
@@ -187,12 +201,14 @@ Moving the confirm step cannot quietly open a path around the gate.
 
 | File | Role |
 |---|---|
-| `supabase/functions/_shared/allocate.ts` | **The one implementation** of allocation and selection. Imported by both the app and the composer. |
+| `supabase/functions/_shared/types.ts` | Domain types. Owned server-side; the client re-exports them as types only. |
+| `supabase/functions/_shared/allocate.ts` | Allocation and selection. **Server-side only.** |
+| `supabase/functions/_shared/compose.ts` | Decision to manifest. **Server-side only.** |
+| `supabase/functions/_shared/speech.ts` | TTS budget and derived cache keys. **Server-side only.** |
+| `supabase/functions/_shared/provider.ts` | Provider adapter boundary. No vendor wired. |
 | `supabase/functions/compose` | **The server-side composer.** Not deployed. |
-| `src/lib/compose.ts` | Assembles a manifest around the shared allocator. |
+| `src/lib/composition.ts` | Transport to the composer. No product logic. |
 | `src/lib/composition.ts` | Calls the composer. Transport only, no product logic. |
-| `src/lib/voice/budget.ts` | TTS budget and derived cache keys. |
-| `src/lib/voice/provider.ts` | Provider adapter boundary. No vendor wired. |
 | `src/lib/cost/rate-card.ts` | Versioned rates. No price in code. |
 | `src/lib/cost/session-cost.ts` | Prices a session from recorded quantities. |
 | `src/types/session-engine.ts` | Domain types. |
@@ -211,7 +227,7 @@ composer takes over **only when it returns a complete manifest**. Today it
 never does, because no modules exist, so every session falls back. It switches
 over on its own when approved content lands.
 
-### Database — 6 migrations, 5 applied
+### Database — 7 migrations, 5 applied
 
 | Migration | Applied |
 |---|---|
