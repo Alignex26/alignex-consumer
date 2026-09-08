@@ -236,11 +236,14 @@ describe('the proprietary tables stay off the client', () => {
   walk(join(__dirname, '..'));
 
   it('never queries a proprietary table from application code', () => {
+    // Production code only. A test that asserts on the literal string is not a
+    // violation of the boundary, it is the boundary being checked.
+    const appCode = sources.filter((f) => !f.includes('__tests__'));
     // The security boundary, as a regression test. These tables hold the five
     // recipes and their eligibility rules, and are service-role only. A client
     // query would return nothing and look merely broken, so the mistake would
     // be easy to make and hard to spot.
-    for (const file of sources) {
+    for (const file of appCode) {
       const text = readFileSync(file, 'utf8');
       for (const table of PROPRIETARY) {
         expect(text).not.toContain(`.from('${table}')`);
@@ -393,5 +396,53 @@ describe('manifest persistence', () => {
       screen.indexOf('createdRun.current = true;')
     );
     expect(effect).toContain('if (composition.loading) return;');
+  });
+});
+
+describe('unapproved modules cannot reach a session', () => {
+  const COMPOSER = readFileSync(
+    join(__dirname, '..', '..', 'supabase', 'functions', 'compose', 'index.ts'),
+    'utf8'
+  );
+
+  it('filters the library on approved and active, server-side', () => {
+    // `approved` is the clinical gate, and this single query is the whole of
+    // its enforcement — there is no second check further down. Asserted
+    // against the deployed composer rather than inferred from the schema
+    // having the column, because a column enforces nothing on its own.
+    const query = COMPOSER.slice(
+      COMPOSER.indexOf('.from("intervention_modules")'),
+      COMPOSER.indexOf('const modules =')
+    );
+
+    expect(query).toContain('.eq("is_active", true)');
+    expect(query).toContain('.eq("approved", true)');
+  });
+
+  it('reports library_empty when nothing is approved', () => {
+    // With the filter applied and no approved rows the list is empty, which is
+    // an explicit non-composable failure rather than a session built from
+    // drafts. The app then falls back to the catalogue path.
+    expect(COMPOSER).toContain('if (modules.length === 0) return fail("library_empty");');
+  });
+
+  it('never reads the module table from the client', () => {
+    // The other half of the gate: were the app to query the table directly it
+    // could compose from whatever RLS let through. It queries it nowhere, and
+    // the table has no anon policy.
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory()
+          ? walk(join(dir, e.name))
+          : /\.tsx?$/.test(e.name)
+            ? [join(dir, e.name)]
+            : []
+      );
+
+    const appCode = walk(join(__dirname, '..')).filter((f) => !f.includes('__tests__'));
+
+    for (const file of appCode) {
+      expect(readFileSync(file, 'utf8')).not.toContain("from('intervention_modules')");
+    }
   });
 });
