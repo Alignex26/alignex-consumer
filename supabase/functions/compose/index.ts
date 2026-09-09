@@ -57,6 +57,17 @@ const TRANSITION_KEYS = [
 
 const MAX_DURATION_SECONDS = 3600;
 
+/** The private bucket holding approved intervention masters. */
+const AUDIO_BUCKET = "intervention-audio";
+
+/**
+ * How long a playable URL stays valid.
+ *
+ * Long enough for the longest session plus a retry or a pause-and-resume; far
+ * short of permanent, so a leaked URL is not a leaked library. Two hours.
+ */
+const SIGNED_URL_TTL_SECONDS = 7200;
+
 type PhaseRow = { ordinal: number; phase: string; min_seconds: number; max_seconds: number };
 
 type ModuleRow = {
@@ -100,7 +111,10 @@ const toModule = (row: ModuleRow): InterventionModule => ({
 
 /** Domain manifest -> wire. The only thing this function does that the
  *  shared composer does not, because the wire shape is snake_case. */
-function toWire(segment: ManifestSegment): Record<string, unknown> {
+function toWire(
+  segment: ManifestSegment,
+  signedUrls: Map<string, string>,
+): Record<string, unknown> {
   const base = {
     kind: segment.kind,
     ordinal: segment.ordinal,
@@ -114,7 +128,10 @@ function toWire(segment: ManifestSegment): Record<string, unknown> {
       ...base,
       module_id: segment.moduleId,
       module_key: segment.moduleKey,
-      storage_path: segment.storagePath,
+      // The signed URL, not the storage path. The client cannot reach the
+      // bucket, and the path would tell it nothing except what the library is
+      // called.
+      audio_url: signedUrls.get(segment.storagePath) ?? null,
       phase: segment.phase,
     };
   }
@@ -256,7 +273,7 @@ Deno.serve(async (req: Request) => {
     .eq("transition_key", transitionKey);
 
   const familiesByPhase = new Map<string, string[]>();
-  for (const row of familyRows ?? []) {
+  for (const row of (familyRows ?? []) as { phase: string; family: string }[]) {
     const list = familiesByPhase.get(row.phase) ?? [];
     list.push(row.family);
     familiesByPhase.set(row.phase, list);
@@ -282,7 +299,8 @@ Deno.serve(async (req: Request) => {
       .select("module_id, positive, total")
       .eq("user_id", userId);
 
-    effectiveness = (data ?? []).map((r) => ({
+    const rows = (data ?? []) as { module_id: string; positive: number; total: number }[];
+    effectiveness = rows.map((r) => ({
       moduleId: r.module_id,
       positive: r.positive,
       total: r.total,
@@ -321,6 +339,35 @@ Deno.serve(async (req: Request) => {
   if (!result.ok) return fail(result.failure);
 
   const { manifest } = result;
+
+  // Resolve every module's audio to a short-lived signed URL. The bucket is
+  // private and has no client policy, so a storage PATH is useless to the app —
+  // only these URLs are playable, and only for a couple of hours.
+  //
+  // A module whose audio cannot be signed is not playable. Rather than hand the
+  // client a segment it will silently render as silence, the whole composition
+  // fails: better no session than one with holes the person cannot explain.
+  const paths = [
+    ...new Set(
+      manifest.segments
+        .filter((seg) => seg.kind === "module")
+        .map((seg) => (seg as { storagePath: string }).storagePath),
+    ),
+  ];
+
+  const signed = new Map<string, string>();
+  if (paths.length > 0) {
+    const { data: urls } = await admin.storage
+      .from(AUDIO_BUCKET)
+      .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
+
+    for (const entry of urls ?? []) {
+      if (entry.signedUrl && !entry.error) signed.set(entry.path ?? "", entry.signedUrl);
+    }
+  }
+
+  if (signed.size !== paths.length) return fail("audio_unavailable");
+
   const manifestId = await persistManifest(admin, userId, manifest);
 
   return json({
@@ -334,7 +381,7 @@ Deno.serve(async (req: Request) => {
       recipe_version: manifest.recipeVersion,
       dynamic_seconds: manifest.dynamicSeconds,
       exceptional_speech: manifest.dynamicSeconds > BUDGET_NORMAL_SECONDS,
-      segments: manifest.segments.map(toWire),
+      segments: manifest.segments.map((seg) => toWire(seg, signed)),
     },
   });
 });

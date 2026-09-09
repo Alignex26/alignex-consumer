@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { buildTimeline, edgeGain, type CueSource, type Timeline, type TimelineFault } from '@/audio/timeline';
-import { getSupabase } from '@/lib/supabase';
 import type { PlaybackStatus } from '@/types/elsea';
 import type { SessionManifest } from '@/types/session-engine';
 
@@ -95,34 +94,6 @@ export type ManifestPlayback = {
 };
 
 /**
- * Turns a stored path into a URL, confirming something is actually there.
- *
- * A 404 body handed to the player surfaces as an opaque decode failure much
- * later; checking here means a missing asset becomes a clean, reportable
- * silence instead.
- */
-async function publicUrl(storagePath: string): Promise<string | null> {
-  const supabase = getSupabase();
-  if (!supabase) return null;
-
-  const slash = storagePath.indexOf('/');
-  if (slash <= 0) return null;
-
-  try {
-    const { data } = supabase.storage
-      .from(storagePath.slice(0, slash))
-      .getPublicUrl(storagePath.slice(slash + 1));
-    const url = data?.publicUrl;
-    if (!url) return null;
-
-    const head = await fetch(url, { method: 'HEAD' });
-    return head.ok ? url : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Resolves a cue reference to a URL.
  *
  * The one place the manifest's references meet storage. Injectable so the
@@ -131,13 +102,14 @@ async function publicUrl(storagePath: string): Promise<string | null> {
 export type CueResolver = (source: CueSource) => Promise<string | null>;
 
 const defaultResolver: CueResolver = async (source) => {
-  // Module paths arrive already resolved on the manifest, because the composer
-  // runs server-side and `intervention_modules` is no longer readable from a
-  // client. Nothing here queries a proprietary table.
-  if (source.kind === 'module') return publicUrl(source.storagePath);
+  // Module audio arrives as a short-lived signed URL, already resolved by the
+  // composer. The bucket is private and the client cannot reach it, so there is
+  // nothing to look up and no proprietary table to query — the URL is played
+  // as given.
+  if (source.kind === 'module') return source.storagePath;
 
-  // Generated speech has no path yet: no provider is wired, so nothing is ever
-  // synthesised. When it is, the composer will carry the path the same way.
+  // Generated speech has no audio yet: no provider is wired, so nothing is ever
+  // synthesised. When it is, the composer will sign it the same way.
   return null;
 };
 

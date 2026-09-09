@@ -252,11 +252,12 @@ async function selectSession(
 
   // Longest that fits. If no time given, default to the shortest so the
   // first experience is never longer than someone expected.
+  const rows = data as { id: string; duration_seconds: number }[];
   const fits = timeAvailable
-      ? data.filter((s) => s.duration_seconds <= timeAvailable)
+      ? rows.filter((s) => s.duration_seconds <= timeAvailable)
       : [];
 
-  const chosen = fits.length ? fits[0] : data[data.length - 1];
+  const chosen = fits.length ? fits[0] : rows[rows.length - 1];
   return { sessionId: chosen.id, durationSeconds: chosen.duration_seconds };
 }
 

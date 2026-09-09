@@ -151,11 +151,16 @@ export function scoresFrom(
  * a phase play several. Chaining keeps modules small, reusable and cheap,
  * which is the whole economic thesis.
  *
- * NO MODULE REPEATS WITHIN A PHASE. Hearing the same technique twice in a row
- * is a content judgement, not an engineering one, so the conservative choice is
- * taken: when the eligible modules are exhausted the rest of the phase is
- * silence. If repetition turns out to be acceptable, that is a product decision
- * and this is the one place it would change.
+ * NO MODULE PLAYS TWICE IN A SESSION. A locked product decision, and wider
+ * than it first was: the rule used to be per-phase, so a module eligible in two
+ * phases could be selected in both and a person heard the same material twice
+ * in one session. `used` is now owned by `planPhases` and threaded through
+ * every phase, so selection is a session-level invariant.
+ *
+ * When the unused eligible modules are exhausted the rest of the phase becomes
+ * silence. Composition is never allowed to repeat content to fill time, and a
+ * phase that cannot be started at all fails explicitly rather than quietly
+ * shortening the session.
  *
  * NOT OPTIMAL PACKING, DELIBERATELY. Modules are taken best-rated first, then
  * longest, which can leave more silence than a perfect fit would: given a 400s
@@ -167,10 +172,15 @@ export function scoresFrom(
 export function fillPhase(
   candidates: readonly PlanModule[],
   allocatedSeconds: number,
-  scores: ReadonlyMap<string, number>
+  scores: ReadonlyMap<string, number>,
+  /**
+   * Module ids already played in this session. MUTATED: ids chosen here are
+   * added, so the next phase cannot pick them. Defaulted so the function stays
+   * usable on its own in tests.
+   */
+  used: Set<string> = new Set<string>()
 ): PlanModule[] {
   const chosen: PlanModule[] = [];
-  const used = new Set<string>();
   let remaining = allocatedSeconds;
 
   // Bounded by the candidate list: every iteration either takes a module out
@@ -212,13 +222,21 @@ export function planPhases(
   const segments: PlanSegment[] = [];
   let offset = startOffset;
 
+  // Session-level, not phase-level. A module selected in an early phase is out
+  // of contention for every later one.
+  const usedInSession = new Set<string>();
+
   for (let i = 0; i < phases.length; i += 1) {
     const phase = phases[i];
     const seconds = allocation[i];
-    const chosen = fillPhase(candidatesByPhase(phase.phase), seconds, scores);
+    const chosen = fillPhase(candidatesByPhase(phase.phase), seconds, scores, usedInSession);
 
-    // A phase nothing fits cannot be filled at all. Better no session than one
-    // with an unapproved or empty phase in the middle of it.
+    // A phase nothing fits cannot be filled at all — either nothing eligible is
+    // short enough, or everything eligible has already been played earlier in
+    // this session. Both fail explicitly. Composition never repeats content to
+    // fill time, and never shortens the session to hide thin inventory: the
+    // allocation was fixed before selection began and the shortfall shows up as
+    // silence, not as a shorter session.
     if (chosen.length === 0) return { ok: false, failure: 'phase_unfilled' };
 
     let spent = 0;

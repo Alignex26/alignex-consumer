@@ -12,11 +12,11 @@ Companions:
 
 - [`session-engine.md`](./session-engine.md) — architecture of record for
   composition, cost and playback.
-- [`module-library.md`](./module-library.md) — constraints the intervention
-  library has to satisfy, computed from the allocator.
-- [`tranche-nervous-ready.md`](./tranche-nervous-ready.md) and
-  [`tranche-wound-up-home.md`](./tranche-wound-up-home.md) — the content briefs
-  for the first two recipes, written for an author who does not read code.
+  - [`module-library.md`](./module-library.md) — constraints the intervention
+    library has to satisfy, computed from the allocator.
+  - [`tranche-nervous-ready.md`](./tranche-nervous-ready.md) and
+    [`tranche-wound-up-home.md`](./tranche-wound-up-home.md) — the content briefs
+    for the first two recipes, written for an author who does not read code.
 
 This file is the inventory and the state of play.
 
@@ -29,13 +29,13 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 133 passing across 7 suites |
+| Tests | 221 passing across 10 suites |
 | TypeScript | clean |
 | Lint | 1 pre-existing error in `src/hooks/use-color-scheme.web.ts` (Expo starter, web-only, untouched) |
-| Migrations | 7 written, **all applied** |
-| Edge functions | `interpret` and `compose` both **deployed** |
+| Migrations | 8 written, **all applied** |
+| Edge functions | `interpret` and `compose` deployed and current (`npm run deploy:check`) |
 | Audio content | **none exists** |
-| Blocking | the intervention-module library — 2 of 5 recipes specified |
+| Blocking | approved intervention content and audio. All 5 recipes specified. |
 
 **The product runs end to end today** on the catalogue path, as a correctly
 timed session with no sound. The whole flow — safety gate, interpretation,
@@ -50,31 +50,31 @@ Not preferences. Breaking any is a defect, and most are enforced by tests.
 
 - **Raw free text never reaches interpretation or selection without passing the
   server-side safety gate.** If the gate fails technically, **fail closed**.
-- **No raw user text reaches TTS, a cache key, or analytics.** Dynamic copy is
-  built from structured state only. `SpeechContext` has no field for what the
-  person wrote and no way to add one.
-- **Never** `console.log` raw user free text, send it to PostHog, or put it in
-  a generic analytics property.
-- **The recipes are private.** `recipe_phases`, `recipe_phase_families` and
-  `intervention_modules` are service-role only and must never be given an anon
-  policy.
-- **The decision engine never ships to a device.** Nothing under `src/` may
-  import `supabase/functions/_shared/` at runtime; type-only imports are fine
-  because they are erased. Enforced by test.
-- **Approved intervention audio must not sit in an enumerable public bucket.**
-  Master module recordings are the same class of IP as the recipes. Production
-  manifests must resolve private assets through short-lived signed URLs. This
-  will not stop a determined capture, but it prevents trivial catalogue
-  scraping. *Not yet implemented — no storage system and no audio exists.*
-- **No service-role Supabase key client-side. No provider key bundled
-  client-side. No server secret in an `EXPO_PUBLIC_` variable.**
-- **Do not weaken RLS for development convenience.**
-- **Dynamic TTS ≤30s per session, hard ceiling 45s**, enforced server-side
-  where the paid provider can actually be called. Never trust a client-supplied
-  budget. Over-budget is rejected, never trimmed.
-- **Duration is a runtime parameter, not the identity of an intervention** (P4).
-  No 5/10/15/20-minute variants of anything, ever.
-- **Canonical values are never renamed to match UI language.**
+  - **No raw user text reaches TTS, a cache key, or analytics.** Dynamic copy is
+    built from structured state only. `SpeechContext` has no field for what the
+    person wrote and no way to add one.
+  - **Never** `console.log` raw user free text, send it to PostHog, or put it in
+    a generic analytics property.
+  - **The recipes are private.** `recipe_phases`, `recipe_phase_families` and
+    `intervention_modules` are service-role only and must never be given an anon
+    policy.
+  - **The decision engine never ships to a device.** Nothing under `src/` may
+    import `supabase/functions/_shared/` at runtime; type-only imports are fine
+    because they are erased. Enforced by test.
+  - **Approved intervention audio must not sit in an enumerable public bucket.**
+    Master module recordings are the same class of IP as the recipes. Production
+    manifests must resolve private assets through short-lived signed URLs. This
+    will not stop a determined capture, but it prevents trivial catalogue
+    scraping. *Not yet implemented — no storage system and no audio exists.*
+  - **No service-role Supabase key client-side. No provider key bundled
+    client-side. No server secret in an `EXPO_PUBLIC_` variable.**
+  - **Do not weaken RLS for development convenience.**
+  - **Dynamic TTS ≤30s per session, hard ceiling 45s**, enforced server-side
+    where the paid provider can actually be called. Never trust a client-supplied
+    budget. Over-budget is rejected, never trimmed.
+  - **Duration is a runtime parameter, not the identity of an intervention** (P4).
+    No 5/10/15/20-minute variants of anything, ever.
+  - **Canonical values are never renamed to match UI language.**
 
 ---
 
@@ -85,53 +85,53 @@ Recorded so they are not relitigated.
 ### Product
 
 - **P1** — synthesised voice in scope for V1, bounded.
-- **P4** — five canonical recipes; duration is a runtime composition parameter.
-- **P19** — the five recipe phase structures, **approved as a product draft**.
-  Seeded in migration `20260908150000`. See §5.
-- **Module families** — twelve product-level taxonomy slots. Canonical form is
-  **lower case**: `orient`, `regulate`, `ground`, `release`, `reframe`,
-  `focus`, `activate`, `prepare`, `transition`, `settle`, `sleep`, `close`.
-  Upper case is a display treatment only and never reaches the database, the
-  API or the domain model. Slots only — the technique that fills one is
-  authored and approved outside engineering.
-- **Eligibility is family-level.** `recipe_phase_families` is the only V1
-  mechanism. `module_affinities` was removed rather than left as a second,
-  vaguer answer to the same question. A per-module clinical override, if ever
-  needed, will be an explicit construct decided at the time.
-- **Target cards** — six, exhaustive 1:1 onto the canonical targets:
-  `focused → Focused`, `activated → Energised`, `home → Calmer`,
-  `sleep → Rested`, `ready → Confident`, `settled → Settled`. "Happier" is
-  deliberately absent: it has no approved canonical target.
-- **Durations** — exact values: 300 / 600 / 900 / 1200 seconds. `unsure`
-  resolves to the shortest.
-- **Bottom navigation** — deferred, not built.
+  - **P4** — five canonical recipes; duration is a runtime composition parameter.
+  - **P19** — the five recipe phase structures, **approved as a product draft**.
+    Seeded in migration `20260908150000`. See §5.
+  - **Module families** — twelve product-level taxonomy slots. Canonical form is
+    **lower case**: `orient`, `regulate`, `ground`, `release`, `reframe`,
+    `focus`, `activate`, `prepare`, `transition`, `settle`, `sleep`, `close`.
+    Upper case is a display treatment only and never reaches the database, the
+    API or the domain model. Slots only — the technique that fills one is
+    authored and approved outside engineering.
+  - **Eligibility is family-level.** `recipe_phase_families` is the only V1
+    mechanism. `module_affinities` was removed rather than left as a second,
+    vaguer answer to the same question. A per-module clinical override, if ever
+    needed, will be an explicit construct decided at the time.
+  - **Target cards** — six, exhaustive 1:1 onto the canonical targets:
+    `focused → Focused`, `activated → Energised`, `home → Calmer`,
+    `sleep → Rested`, `ready → Confident`, `settled → Settled`. "Happier" is
+    deliberately absent: it has no approved canonical target.
+  - **Durations** — exact values: 300 / 600 / 900 / 1200 seconds. `unsure`
+    resolves to the shortest.
+  - **Bottom navigation** — deferred, not built.
 
 ### Safety and clinical
 
 - **S3** — context may influence personalised voice; raw user text must never
   be passed into speech or echoed without an approved transformation boundary.
-- **S13** — boundaries and expansion rules approved.
-- **S14** — all duration floors **provisional pending clinical review**.
-  `recipe_phases.is_provisional` carries this in the data.
-- **S15** — silence is composed, never baked into a file.
-- **S16** — **any phase or planner change requires re-approval.** Granted once
-  since: a phase now chains several modules rather than playing one and padding
-  the rest with silence. See `module-library.md` §3.
-- **S4** — clinical technique content is authored and approved outside
-  engineering. `intervention_modules.approved` gates it.
+  - **S13** — boundaries and expansion rules approved.
+  - **S14** — all duration floors **provisional pending clinical review**.
+    `recipe_phases.is_provisional` carries this in the data.
+  - **S15** — silence is composed, never baked into a file.
+  - **S16** — **any phase or planner change requires re-approval.** Granted once
+    since: a phase now chains several modules rather than playing one and padding
+    the rest with silence. See `module-library.md` §3.
+  - **S4** — clinical technique content is authored and approved outside
+    engineering. `intervention_modules.approved` gates it.
 
 ### Commercial — the eight profitability rules
 
 > ELSEA generates the **decision**, not the **session**.
 
 1. Unlimited sessions for the customer.
-2. Sessions are composed, never wholly generated or stored whole.
-3. AI interpretation produces structured state, not freeform therapy.
-4. Dynamic TTS normally ≤30s per session; ceiling 45s.
-5. Reusable audio served from storage/CDN, produced once.
-6. Client-side composition from a manifest.
-7. Voice provider abstracted, never hard-wired.
-8. Personalisation from effectiveness data, not bigger prompts.
+   2. Sessions are composed, never wholly generated or stored whole.
+   3. AI interpretation produces structured state, not freeform therapy.
+   4. Dynamic TTS normally ≤30s per session; ceiling 45s.
+   5. Reusable audio served from storage/CDN, produced once.
+   6. Client-side composition from a manifest.
+   7. Voice provider abstracted, never hard-wired.
+   8. Personalisation from effectiveness data, not bigger prompts.
 
 ---
 
@@ -168,9 +168,9 @@ Two reasons the decision has to be server-side:
 
 1. **The recipes are the IP.** While those tables were anon-readable, anyone
    who pulled the public key out of the app bundle could enumerate them.
-2. **The composer is the only thing that can call a paid TTS provider**, so it
-   is the only place the dynamic-speech budget can be enforced. A ceiling
-   checked only on a client is not a ceiling.
+   2. **The composer is the only thing that can call a paid TTS provider**, so it
+      is the only place the dynamic-speech budget can be enforced. A ceiling
+      checked only on a client is not a ceiling.
 
 ---
 
@@ -248,6 +248,7 @@ over on its own when approved content lands.
 | `20260908130000_session_cost_telemetry` | yes |
 | `20260908150000_protect_recipes_and_seed_p19` | yes |
 | `20260908160000_drop_module_affinities` | yes |
+| `20260909100000_private_intervention_audio` | yes |
 
 Catalogue era: `transitions`, `sessions_catalogue`, `session_segments`,
 `safety_events`, `user_sessions`, `session_outcomes`.
@@ -257,6 +258,13 @@ Session engine: `intervention_modules`, `recipe_phases`,
 `session_manifests`, `manifest_segments`.
 
 Cost: `provider_pricing` (append-only, trigger-enforced), `session_costs`.
+
+**Private audio.** Approved masters live in the `intervention-audio` bucket,
+which is private with no client policy. Verified against the live system: anon
+write returns `403` RLS violation, a public read returns `400`, and reading the
+bucket's metadata returns `404 Bucket not found` — anon cannot see that it
+exists. The composer signs per-segment URLs with a 2-hour expiry; the client
+never receives a storage path and never touches the bucket.
 
 **RLS posture.** Service-role only, no client policy at all: `recipe_phases`,
 `recipe_phase_families`, `intervention_modules`, `provider_pricing`,
@@ -305,208 +313,134 @@ Probed, not assumed:
   `provider_pricing` and `intervention_modules` return `42501`, rejected
   *before* the FK and CHECK constraints fire. That ordering is only possible
   with RLS active.
-- **Catalogue path intact.** `transitions` 5 rows, `sessions_catalogue` 16,
-  `session_segments` 16 visible to anon.
-- **Screens 1 and 2** measured across seven frames, 320×568 to 430×950.
-- **One allocator, and it does not ship.** The composer and the tests share
-  `supabase/functions/_shared/allocate.ts`; the app imports none of it. The 47
-  engine and timeline tests passed unchanged across the refactor, which is the
-  parity evidence — same inputs, same manifests, one implementation. Absence
-  from the client was confirmed by grepping a real Metro bundle rather than by
-  reading imports, because `tsc` and jest run through babel and would not
-  catch a bundler difference.
+  - **Catalogue path intact.** `transitions` 5 rows, `sessions_catalogue` 16,
+    `session_segments` 16 visible to anon.
+  - **Screens 1 and 2** measured across seven frames, 320×568 to 430×950.
+  - **One allocator, and it does not ship.** The composer and the tests share
+    `supabase/functions/_shared/allocate.ts`; the app imports none of it. The 47
+    engine and timeline tests passed unchanged across the refactor, which is the
+    parity evidence — same inputs, same manifests, one implementation. Absence
+    from the client was confirmed by grepping a real Metro bundle rather than by
+    reading imports, because `tsc` and jest run through babel and would not
+    catch a bundler difference.
 
-- **The recipe lockdown is live.** Against the deployed database, anon reading
-  `recipe_phases` gets `200 []` while the table holds 31 rows, and
-  `recipe_phase_families` the same against 53. RLS is hiding real data, not an
-  empty table — which is a far stronger result than probing empty tables was.
-  `module_affinities` returns `404 PGRST205`; it is gone.
+  - **The recipe lockdown is live.** Against the deployed database, anon reading
+    `recipe_phases` gets `200 []` while the table holds 31 rows, and
+    `recipe_phase_families` the same against 53. RLS is hiding real data, not an
+    empty table — which is a far stronger result than probing empty tables was.
+    `module_affinities` returns `404 PGRST205`; it is gone.
 
-  The rows are proven present by `compose` itself: it answers `library_empty`,
-  a failure reached only AFTER the recipe lookup succeeds. Had the recipes been
-  missing it would have said `no_recipe`.
-- **Deno resolves the shared engine.** The deploy uploads
-  `_shared/compose.ts`, `allocate.ts`, `speech.ts` and `types.ts` alongside the
-  function, following the import chain. This could not be checked locally —
-  no `deno` binary, no Docker — and the deploy settled it.
-- **The composer behaves.** `library_empty` for a valid transition with no
-  modules, `bad_duration` for 99999 seconds, `unknown_transition` for an
-  unknown or absent key.
-- **The whole flow was walked on a device**, welcome through to the outcome
-  question. The session screen logged
-  `[ELSEA] Session engine unavailable (library_empty)` — which is the chain
-  proving itself end to end: the app called the deployed composer, the composer
-  read the seeded recipes with the service role, found no modules, and the app
-  fell back to the catalogue path and ran a correctly timed silent session.
-  Pause was verified by holding the clock at 0:37 across five seconds rather
-  than by assuming. Availability gating showed correctly: from `tired_wired`
-  the only target offered was Sleep, and only "Rested" was enabled.
+    The rows are proven present by `compose` itself: it answers `library_empty`,
+    a failure reached only AFTER the recipe lookup succeeds. Had the recipes been
+    missing it would have said `no_recipe`.
+  - **Deno resolves the shared engine.** The deploy uploads
+    `_shared/compose.ts`, `allocate.ts`, `speech.ts` and `types.ts` alongside the
+    function, following the import chain. This could not be checked locally —
+    no `deno` binary, no Docker — and the deploy settled it.
+  - **The composer behaves.** `library_empty` for a valid transition with no
+    modules, `bad_duration` for 99999 seconds, `unknown_transition` for an
+    unknown or absent key.
+  - **The whole flow was walked on a device**, welcome through to the outcome
+    question. The session screen logged
+    `[ELSEA] Session engine unavailable (library_empty)` — which is the chain
+    proving itself end to end: the app called the deployed composer, the composer
+    read the seeded recipes with the service role, found no modules, and the app
+    fell back to the catalogue path and ran a correctly timed silent session.
+    Pause was verified by holding the clock at 0:37 across five seconds rather
+    than by assuming. Availability gating showed correctly: from `tired_wired`
+    the only target offered was Sleep, and only "Rested" was enabled.
 
 ---
 
-## 6b. Content coverage — audited 2026-09-09
+## 6b. Content coverage — all five specified
 
-Two of the five recipes have a content specification. The other three do not.
+Every recipe now has a content specification, and the consolidated plan is
+[`module-inventory-v1.md`](./module-inventory-v1.md): **47 modules**.
 
-| Recipe | Spec | Minimum modules | Silence at 300 / 600 / 900 / 1200 |
-|---|---|---:|---|
-| `nervous_ready` | [tranche](./tranche-nervous-ready.md) | 5 | 8 / 54 / 69 / 77% |
-| `wound_up_home` | [tranche](./tranche-wound-up-home.md) | 5 | 3 / 44 / 63 / 72% |
-| `scattered_focused` | — | — | — |
-| `wired_sleep` | — | — | — |
-| `flat_go` | — | — | — |
+The number was not chosen. Each module exists because removing it breaks one of
+the twenty recipe/duration cases, or because the library would otherwise be so
+thin that the same few played every session.
 
-Both minimums are five modules, and both are roughly 70% silence at twenty
-minutes with only the minimum. Around eleven brings each into the 12–20% range.
+| | |
+|---|---|
+| Recipes specified | 5 of 5 |
+| Proposed modules | 47, across 12 families |
+| Composition cases proven | 20 of 20 |
+| Repeated modules in any manifest | 0 |
+| Silence range | 3–30%, worst at 300s |
 
-### Modules do share between recipes, but less than the count suggests
+Proven by `src/__tests__/composition-proof.test.ts`, which runs the real
+allocator over every case. It is both the evidence and the regression guard: a
+change to the allocator, the recipes or the inventory that breaks any of the
+twenty fails there.
 
-**Seven modules serve both specified recipes**, against ten if nothing were
-shared — `orient`, `regulate` and `close` do double duty when each is sized to
-the *tighter* of the two requirements.
-
-That sharing does not extend as far as it looks. The same seven compose
-`nervous_ready` and `wound_up_home` and **fail all three of the others** at 300
-seconds.
-
-### The trap: family coverage does not mean composability
-
-`wired_sleep` has an eligible family present for every one of its phases with
-that seven-module set, and still fails. Its `close` phase is allocated **11
-seconds**; the shared `close` module is 16, sized for the two recipes already
-specified, and 16 will not fit into 11.
-
-So a module shared across recipes must be sized to the **tightest slot in any
-recipe that uses it**, not the tightest in the recipe it was written for. A
-`close` module intended to serve all five has to be ≤11s.
-
-Checking family eligibility alone will say a recipe is covered when it is not.
-Only running `compose` proves it.
-
-### The thirty-module figure is optimistic
-
-`module-library.md` sketches an inventory of thirty across all twelve families.
-On the evidence of two specified recipes — five each as a floor, around eleven
-each to be usable, and only partial sharing between them — **the realistic
-total is likely closer to forty than thirty.** Not a reason to change anything
-yet; a reason not to treat thirty as a budget.
+**The binding constraint is duration, not family.** A module is sized to the
+tightest slot in ANY recipe that uses it, not the recipe it was written for. A
+`close` module sized 16s for `nervous_ready` is unselectable in `wired_sleep`,
+whose `close` gets 11s — and that recipe then has no five-minute session at
+all. Family coverage looks like composability and is not.
 
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
 
-- **No audio content.** `intervention_modules` is empty. Every session runs
-  silent, which the UI states.
-- **Edge Functions are not typechecked.** `tsconfig.json` excludes `supabase/`
-  and nothing under `src/` imports a function, so tsc never sees one. This is
-  not theoretical: an import of a name that did not exist deployed
-  successfully and returned BOOT_ERROR to every caller, and the CLI still said
-  "Deployed Functions." A test now resolves every relative named import in the
-  functions tree against the target's real exports, which catches that class of
-  error, but it is not a typechecker. Deno type errors still reach production.
-- **A module can repeat across phases within one session.** `fillPhase` builds
-  its no-repeat set per call, so the rule is per-PHASE only: a module eligible
-  in two phases can be selected in both. The documented no-repeat rule reads
-  narrower than the behaviour.
-
-  It is not hypothetical and not rare. With the minimum inventory,
-  `wound_up_home` produces 6 module segments at 300s and 7 at longer durations
-  from 5 distinct modules, because three of its families span two phases each.
-  `nervous_ready` does the same once, via `prepare`.
-
-  **PRODUCT DECISION REQUIRED.** Whether a person may hear the same technique
-  twice in one session, and whether adjacency makes it worse. Not a defect and
-  deliberately unchanged — it is a content judgement with an engineering
-  consequence, and changing it is S16 territory.
-
-- **Nothing verifies that deployed functions match the repository.**
-  `supabase migration list` reports migration drift; there is no equivalent for
-  Edge Functions. `supabase functions deploy` reports success without saying
-  what it replaced, and a function can sit live for days behind `main`.
-
-  This is not theoretical. `_shared/allocate.ts` changed by 74 lines when phase
-  chaining landed and was not redeployed for three commits; the live composer
-  was still padding phases with silence while every figure in
-  `module-library.md` described chaining. It happened to be harmless because an
-  empty library short-circuits before the allocator runs — had modules landed
-  first, live behaviour would have silently disagreed with every measurement in
-  that document.
-
-  Until something automates it, check before claiming parity:
-
-  ```bash
-  git log --oneline <last-deploy-commit>..HEAD -- supabase/functions/
-  ```
-
-  An empty result means the deployment is current. Anything else means
-  redeploy. Worth noting the trap: comparing the working tree to `main` proves
-  nothing about what is deployed, and reads like a parity check while being
-  entirely silent about it.
-
-- **Manifest persistence is written and deployed but has never run.** The
-  composer records a manifest and links it to the run, completing
-  `session_costs -> session_manifests -> user_sessions -> session_outcomes`.
-  The code sits downstream of a successful composition, which needs approved
-  modules, so with an empty library it is unreachable and untested in
-  execution. It will first run when real modules land, and should be watched
-  the first time it does.
-- **Nothing writes `session_costs` yet.** The manifest link exists; the cost
-  row does not. That needs the generation path, which needs a TTS provider.
-- **No TTS provider, and no dynamic speech.** Sessions bill nothing. This gates
-  only the small dynamic-speech layer — recipes, modules, manifests,
-  effectiveness and static audio all progress without it.
-- **Edge fades, not crossfades.** A true crossfade overlaps cues, so playback
-  would finish before the composed duration and drift from the progress bar.
-  Real crossfade needs composition to model the overlap.
+- **No audio content and no approved modules.** `intervention_modules` is
+  empty. Every session runs on the catalogue fallback, silent, which the UI
+  states. This is the blocker.
+- **Manifest persistence is verified in structure, not in execution.** The rows
+  it would write are checked against the real schema constraints, and the
+  rollback path is pinned, but no INSERT has run — that needs an approved
+  module with real audio, and inventing one is precisely what must not happen.
+  Watch it the first time real content lands.
+- **Nothing writes `session_costs`.** The manifest link and every column exist;
+  the row does not, because there is no generation to cost. Needs a TTS
+  provider.
+- **No TTS provider, no dynamic speech.** Deliberately deferred. Sessions bill
+  nothing. `_shared/provider.ts` is the adapter boundary; `speech.ts` holds the
+  budget. Both server-side.
+- **Edge Function typechecking is real but partial.** `npm run
+  typecheck:functions` checks the functions' own logic — imports resolve, names
+  exist, types line up — using hand-written ambient stubs in
+  `supabase/functions/deno-ambient.d.ts`. It does NOT verify calls against the
+  real supabase-js signatures, because there is no `deno` here and tsc cannot
+  resolve a `jsr:` specifier. Do not read a clean run as full Deno type safety.
+- **Edge fades, not crossfades.** A true crossfade overlaps cues and would make
+  playback finish before the composed duration. Deferred to the design pass.
 - **`FADE_SECONDS`, `BED_GAIN`, `BED_GAIN_DUCKED` are engineering defaults**,
   not approved production values.
-- **`assets/images/elsea-transition-hero.png`** is committed but unreferenced.
-- **Cost retention is undecided.** Cost rows cascade from the user, so deleting
-  an account erases its cost history.
-
----
 
 ## 8. What is needed next, and from whom
 
-The architecture phase is **closed**. Migrations applied, composer deployed,
-lockdown verified.
+Engineering has taken this as far as it legitimately can without content.
 
-**Two product questions the device walk surfaced.** Neither is a defect;
-both are decisions.
+**From content and clinical — the blocker:**
 
-1. A state pill alone routes to the correction screen rather than into a
-   session, because a shortcut is not an interpretation. Correct by design, but
-   it costs two extra taps on what is likely the most common quick path.
-2. Availability gating is strict: someone arriving `tired_wired` sees one
-   enabled target and five dimmed cards. Right per the taxonomy; whether five
-   dimmed cards is the right presentation is a design call.
+1. The 47 modules in [`module-inventory-v1.md`](./module-inventory-v1.md):
+   technique, wording, delivery, and a `technique_key` per module.
+2. `intensity` semantics — the column is 1–10 and read by nothing; what a 3
+   means versus an 8 is undefined.
+3. Audio format — no codec, sample rate, bitrate, channel count or loudness
+   target is documented anywhere.
+4. Whether 20–30% silence in a five-minute session is acceptable. If not, the
+   answer is more short modules.
 
-Also outstanding and purely cosmetic: the target and time screen still shows
-"STATE TRANSITION INTELLIGENCE", which the entry redesign removed from Screens
-1 and 2 but which was out of scope for that work.
+**From design:** the screen pass. Two questions from the device walk are still
+open — a state pill routes to the correction screen rather than into a session,
+and someone arriving `tired_wired` sees one enabled target card and five
+dimmed.
 
-**The real work now: the intervention-module library.** Nothing composes until
-approved modules exist. The engineering constraints are computed and written up
-in [`module-library.md`](./module-library.md) — including two that would
-otherwise be discovered after recording: `close` needs a module of 10 seconds
-or less and `orient` one of 20 seconds or less, or no five-minute session can
-be composed at all. A small, exceptional set beats hundreds of mediocre
-ones. This is content and clinical work, not architecture — and it is where the
-experience the person actually hears gets made.
-
-**Engineering, once modules exist:** persist manifests and link `manifest_id`;
-walk the session screen on device; then the dynamic-speech layer, which is when
-the TTS provider decision finally matters.
-
----
+**From engineering, once content exists:** upload masters to the private
+bucket, set `approved`, watch manifest persistence execute for the first time,
+then the dynamic speech layer when a provider is chosen.
 
 ## 9. Working on it
 
 ```bash
+npm run verify                          # types + function types + lint + tests
+npm run typecheck                       # client types
+npm run typecheck:functions             # Edge Function types (see gaps)
+npm run deploy:check                    # are deployed functions current?
 npx expo start                          # dev server
-npx tsc --noEmit                        # types
-npx expo lint                           # lint
-npx jest                                # tests
 npx supabase migration list             # what is applied
 npx supabase db push                    # apply pending migrations
 npx supabase functions deploy compose   # deploy the composer
@@ -516,14 +450,14 @@ Notes for whoever picks this up:
 
 - **Read the versioned Expo docs** at `https://docs.expo.dev/versions/v57.0.0/`
   before writing code. The APIs have changed.
-- **React Compiler is enabled.** Do not read refs during render, and do not
-  mutate values returned by hooks. Both are lint errors, and both are real.
-- **Never edit an applied migration.** Add a new one.
-- **Redeploy after touching `supabase/functions/`, including `_shared/`.**
-  A change to shared code is a change to every function that imports it, and
-  nothing will tell you the deployed copy is stale.
-- **The allocator has one home:** `supabase/functions/_shared/allocate.ts`.
-  Keep it dependency-free — no React, Expo, Supabase client, Deno or Node
-  globals — or the app and the Edge Function can no longer share it.
-- Windows: use `adb pull` for screenshots — PowerShell redirection corrupts
-  binaries. Prefix remote paths with `MSYS_NO_PATHCONV=1` in Git Bash.
+  - **React Compiler is enabled.** Do not read refs during render, and do not
+    mutate values returned by hooks. Both are lint errors, and both are real.
+  - **Never edit an applied migration.** Add a new one.
+  - **Redeploy after touching `supabase/functions/`, including `_shared/`.**
+    A change to shared code is a change to every function that imports it, and
+    nothing will tell you the deployed copy is stale.
+  - **The allocator has one home:** `supabase/functions/_shared/allocate.ts`.
+    Keep it dependency-free — no React, Expo, Supabase client, Deno or Node
+    globals — or the app and the Edge Function can no longer share it.
+  - Windows: use `adb pull` for screenshots — PowerShell redirection corrupts
+    binaries. Prefix remote paths with `MSYS_NO_PATHCONV=1` in Git Bash.

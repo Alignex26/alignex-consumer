@@ -33,7 +33,7 @@ type WireSegment = {
   duration_seconds: number;
   module_id?: string;
   module_key?: string;
-  storage_path?: string;
+  audio_url?: string | null;
   phase?: string;
 };
 
@@ -82,13 +82,16 @@ function toSegment(wire: WireSegment): ManifestSegment | null {
   };
 
   if (wire.kind === 'module') {
-    if (!wire.module_id || !wire.module_key || !wire.storage_path) return null;
+    // A module segment without a playable URL is not playable. Refused rather
+    // than coerced: it would otherwise become a cue the player renders as
+    // silence, and the cause would surface much later as a session with holes.
+    if (!wire.module_id || !wire.module_key || !wire.audio_url) return null;
     return {
       ...base,
       kind: 'module',
       moduleId: wire.module_id,
       moduleKey: wire.module_key,
-      storagePath: wire.storage_path,
+      storagePath: wire.audio_url,
       phase: wire.phase ?? '',
     };
   }

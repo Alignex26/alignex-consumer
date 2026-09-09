@@ -105,7 +105,11 @@ export type ManifestSegment =
       durationSeconds: number;
       moduleId: string;
       moduleKey: string;
-      /** Resolved by the composer, so the client never reads a module table. */
+      /**
+       * Where the audio lives. Server-side only: the bucket is private and the
+       * client cannot reach it. The composer replaces this with a short-lived
+       * signed URL before the manifest leaves the server.
+       */
       storagePath: string;
       phase: string;
     }
