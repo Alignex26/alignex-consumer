@@ -37,9 +37,9 @@ Last updated: 2026-09-09.
 | Tests | 354 passing across 14 suites |
 | TypeScript | clean |
 | Lint | clean |
-| Migrations | 11 written, 10 applied, **1 pending** (`20260909180000`) |
+| Migrations | 11 written, **all applied** |
 | Edge functions | `interpret` and `compose` deployed and current (`npm run deploy:check`) |
-| Deployment parity | **STALE** — `compose` changed and has not been redeployed |
+| Deployment parity | verified — marker at `1cfe45f`, matches `main` |
 | Audio content | **none exists** |
 | Blocking | approved intervention content and audio. All 5 recipes specified. |
 
@@ -58,10 +58,10 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `b7a03a0` |
+| Tip | `1cfe45f` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
-| Database | 10 of 11 migrations applied; `20260909180000` is written but **not applied** |
+| Database | all 11 migrations applied |
 
 The repository, the database and the deployed functions are in agreement for
 the first time since the completion pass. An earlier version of this section
@@ -276,7 +276,7 @@ over on its own when approved content lands.
 Nothing here invents content. The validator's job is to refuse a manifest that
 would put unapproved or placeholder material in front of a person.
 
-### Database — 11 migrations, 10 applied
+### Database — 11 migrations, all applied
 
 | Migration | Applied |
 |---|---|
@@ -290,7 +290,7 @@ would put unapproved or placeholder material in front of a person.
 | `20260909100000_private_intervention_audio` | yes |
 | `20260909140000_ingestion_and_atomic_manifest` | yes |
 | `20260909160000_novelty_and_saved_sessions` | yes |
-| `20260909180000_persist_fingerprint` | **no — pending** |
+| `20260909180000_persist_fingerprint` | yes |
 
 Catalogue era: `transitions`, `sessions_catalogue`, `session_segments`,
 `safety_events`, `user_sessions`, `session_outcomes`.
@@ -553,9 +553,9 @@ allocator.
 
 Manifest persistence has never executed — it needs an approved module. The
 multi-segment player has never played a real manifest, for the same reason.
-The importer has never run against real content. The fingerprint now written
-by the composer has never been written in production, because the migration
-that accepts it is not yet applied.
+The importer has never run against real content. The fingerprint path is
+deployed and its migration applied, but no fingerprint has been written yet:
+that needs a manifest, which needs an approved module.
 
 ### The engine/audio distinction
 
