@@ -44,6 +44,46 @@ exercisable.
 
 ---
 
+## 1b. Checkpoint — where the code actually is
+
+**The completion pass is not on `main`.** It sits on a pushed branch, approved
+but not integrated.
+
+| | |
+|---|---|
+| Branch | `elsea-v1-completion`, pushed, tracking `origin/elsea-v1-completion` |
+| Commits ahead of `main` | 3 |
+| `main` tip | `ef68ac8` — does **not** contain the completion pass |
+| Divergence | none; `main` is an ancestor, so integration is a fast-forward |
+
+```
+b74b5f9  Exclude the deploy marker from its own staleness check
+36173c6  Record the deployed commit for the parity check
+2d9fc85  V1 functional completion pass
+```
+
+**Read `main` and this branch differently.** Everything else in this document —
+221 tests, 8 migrations, 47-module inventory, private audio, no-repeat — is
+true of `elsea-v1-completion`. A checkout of `main` has none of it, and its
+tests, docs and function sources are three commits behind.
+
+The database and the deployed functions, however, are **already at the branch
+state**: migrations were applied and both functions deployed during the pass.
+So `main` is currently the odd one out — the repository lags the running
+system, rather than the other way round. That is the reverse of the usual
+drift and worth holding in mind: a `main` checkout will not match production.
+
+Integration, when wanted, is a fast-forward:
+
+```bash
+git checkout main
+git merge --ff-only elsea-v1-completion
+git push origin main
+```
+
+Nothing else is required — no rebase, no conflict resolution — because the
+branch was cut from the current `main` and `main` has not moved since.
+
 ## 2. Hard constraints
 
 Not preferences. Breaking any is a defect, and most are enforced by tests.
