@@ -1,0 +1,57 @@
+[
+  {
+    "module_key": "nr_arrive_short",
+    "family": "orient",
+    "technique_key": "present_moment_orienting",
+    "storage_path": "modules/orient/nr_arrive_short.m4a",
+    "duration_seconds": 21,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false
+  },
+  {
+    "module_key": "nr_regulate_short",
+    "family": "regulate",
+    "technique_key": "extended_exhale_release",
+    "storage_path": "modules/regulate/nr_regulate_short.m4a",
+    "duration_seconds": 45,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false
+  },
+  {
+    "module_key": "nr_reframe_short",
+    "family": "reframe",
+    "technique_key": "nervous_energy_reappraisal",
+    "storage_path": "modules/reframe/nr_reframe_short.m4a",
+    "duration_seconds": 40,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false
+  },
+  {
+    "module_key": "nr_prepare_short",
+    "family": "prepare",
+    "technique_key": "first_action_rehearsal",
+    "storage_path": "modules/prepare/nr_prepare_short.m4a",
+    "duration_seconds": 45,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false
+  },
+  {
+    "module_key": "nr_close_short",
+    "family": "close",
+    "technique_key": "readiness_transition_cue",
+    "storage_path": "modules/close/nr_close_short.m4a",
+    "duration_seconds": 11,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false
+  }
+]
