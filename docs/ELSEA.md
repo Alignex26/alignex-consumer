@@ -38,7 +38,7 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 357 passing across 14 suites |
+| Tests | 362 passing across 14 suites |
 | TypeScript | clean |
 | Lint | clean |
 | Migrations | 11 written, **all applied** |
@@ -62,7 +62,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `658c94c` |
+| Tip | `5f2e4eb` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 11 migrations applied |
@@ -273,8 +273,8 @@ over on its own when approved content lands.
 
 | File | Role |
 |---|---|
-| `scripts/modules-validate.mjs` | Validates a module manifest before anything touches the database. Rejects unknown families, malformed storage paths, duplicates, placeholder `technique_key`s and non-boolean approval. Reports a missing `ffmpeg` as SKIPPED, never as PASSED. |
-| `scripts/modules-import.mjs` | Imports validated modules. **Dry run by default** — a real write needs an explicit flag. |
+| `scripts/modules-validate.mjs` | Validates a module manifest before anything touches the database. Rejects unknown families, malformed storage paths, duplicates, placeholder `technique_key`s, non-boolean approval and bad versions, and checks the audio itself against the production spec. Three-valued exit: `0` verified, `1` invalid, `2` records valid but audio unverified. A skipped check is never reported as a pass. |
+| `scripts/modules-import.mjs` | Imports validated modules and writes their immutable version rows. **Dry run by default** — a real write needs `--commit`. Refuses to commit audio the validator could not verify, unless `--allow-unverified-audio` is passed deliberately. |
 | `src/__fixtures__/modules.example.json` | The shape an author's manifest must take. Example data, clearly marked; not production content. |
 
 Nothing here invents content. The validator's job is to refuse a manifest that
@@ -341,7 +341,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 357 across 14 suites
+### Tests — 362 across 14 suites
 
 | Suite | Covers |
 |---|---|
@@ -502,6 +502,76 @@ else. It fails silently — nothing errors, it is simply never selected.
   short variant in `activate` and `prepare`, and both are marked load-bearing.
 - **`scattered_focused`** can consume three distinct `focus` modules in one
   session, and holds the largest slot anywhere at 402s.
+
+## 6d. The import pipeline, exercised
+
+Run end to end on 2026-09-09 with a scratchpad fixture — synthetic test tones,
+never in the repository, never written to production. It found two defects, one
+of them serious.
+
+### What it proved works
+
+| Step | Result |
+|---|---|
+| Structural validation | 8 malformed manifests, all correctly rejected |
+| Audio technical validation | 6 non-conforming files, all correctly rejected |
+| Dry run | wrote nothing |
+| `--commit` with no service-role key | refused, exit 2 |
+| Invalid manifest | refused before touching anything |
+| Library after all of it | still empty; `compose` still answers `library_empty` |
+
+The eight structural cases: placeholder `technique_key`, unknown family, URL as
+storage path, path under the wrong family, duplicate key, missing approval, bad
+version, and an approved module with no audio file.
+
+The six audio cases: stereo, 48kHz, −8.9 LUFS, −23.9 LUFS, 33kbps, and a
+30-second file declared as 21.
+
+### Defect 1 — a skipped check was reported as import-ready
+
+Without `ffprobe`, the only thing known about a file is that it exists and is
+not empty: **a text file renamed `.m4a` passed**, and the validator printed
+"PASS — nothing blocking import". That contradicted its own principle that a
+skipped check is never a pass.
+
+The validator's exit code is now three-valued — `0` records valid and audio
+either verified or never claimed, `1` records invalid, `2` records valid but
+audio **not** verified — and the importer refuses `--commit` on `2` unless
+`--allow-unverified-audio` is passed deliberately. A dry run still proceeds,
+because it writes nothing.
+
+### Defect 2 — the loudness check had never executed
+
+Serious, and only findable by installing ffmpeg. Two bugs stacked:
+
+1. `loudness()` read ffmpeg's stderr only inside a `catch`, but
+   `ffmpeg -f null -` **succeeds** — so the success path returned null
+   unconditionally and the catch never ran.
+2. After fixing that it still failed: the parser sliced from the opening brace
+   to the end of stderr, and ffmpeg writes progress lines after the JSON
+   summary, so `JSON.parse` threw — swallowed by the same catch and surfaced as
+   "could not be measured", indistinguishable from ffmpeg being absent.
+
+**Consequence: the −16 LUFS and −1 dBTP limits had never been enforced on
+anything and could not have been.** Every other audio check was working.
+
+It failed honestly rather than silently — the validator always said *skipped*,
+never *passed* — which is the only reason it was survivable. Had it claimed a
+pass, a tranche could have been recorded at the wrong level and the fault found
+only on a device, after the studio time was spent.
+
+### Still unexercised
+
+Upload to the private bucket, the module row insert, version-row writing,
+composer selection with approved content, and manifest persistence. **All five
+need a service-role key, which is not available on this machine.** They remain
+the untested part of the path.
+
+### Environment requirement
+
+**`ffmpeg` is now required to import.** Installed here on 2026-09-09 (Gyan
+build 9.0.1, via winget). It is on the user PATH but a shell must be restarted
+to see it. Without it the importer refuses to commit.
 
 ## 7. Known gaps
 
