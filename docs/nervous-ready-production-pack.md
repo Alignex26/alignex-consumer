@@ -45,9 +45,9 @@ mindfulness training. Recorded 2026-09-09.
 | Product approval | **APPROVED** — product owner, 2026-09-09 |
 | Content wording | **APPROVED** — product owner, 2026-09-09 |
 | Wellbeing content review | **APPROVED BY PRODUCT OWNER** |
-| Clinical review | **NOT CLAIMED / NOT RECORDED** |
+| Clinical review | **NOT CLAIMED / NOT RECORDED** — and not required for this content class under S4 as amended |
 | `technique_key` values | **PROPOSED** — five of five, none clinically confirmed |
-| `approved` import flag | **false** — until the existing governance requirement is legitimately satisfied |
+| `approved` import flag | **false** — S4 satisfied 2026-09-09; now held only by the absence of audio |
 
 This distinction is deliberate and is recorded so it is auditable later. A
 product owner with wellbeing training approving wording as general wellbeing
@@ -71,7 +71,10 @@ for two independent reasons, either of which is sufficient:
    `audio_unavailable` — failing the whole composition rather than the current
    clean `library_empty`. The validator enforces the same rule from the other
    side: an approved module with no audio file is a hard failure.
-2. **The governance requirement recorded as S4 has not been satisfied.**
+2. ~~The governance requirement recorded as S4~~ — **satisfied 2026-09-09.**
+   S4 was amended to allow product-owner approval of general wellbeing content;
+   see `ELSEA.md` §3. **No audio still stands**, and reason 1 alone keeps the
+   flag false.
 
 ---
 
@@ -403,8 +406,9 @@ The library remains empty and `compose` still answers `library_empty`.
    two cuts: the third breath cycle, then the closing two sentences. Now
    estimated 36–40s against a 45s ceiling. All five scripts fit.
 2. ~~Content review~~ — **granted 2026-09-09.**
-3. **Clinical review**, including confirmation or replacement of the five
-   proposed `technique_key` values and a decision on `intensity`. **Outstanding.**
+3. ~~Clinical review~~ — **not required for this content class** under S4 as
+   amended 2026-09-09. The five `technique_key` values remain **proposed** and
+   the `intensity` decision is still open; neither blocks recording.
 4. **Approval** — the only thing that makes content selectable.
 5. **Record** to the audio specification: AAC-LC `.m4a`, 44.1 kHz, mono,
    96 kbps, −16 LUFS ±1, ≤ −1 dBTP, ≤100 ms head and tail silence, no fades.

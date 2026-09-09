@@ -149,8 +149,35 @@ Recorded so they are not relitigated.
   - **S16** — **any phase or planner change requires re-approval.** Granted once
     since: a phase now chains several modules rather than playing one and padding
     the rest with silence. See `module-library.md` §3.
-  - **S4** — clinical technique content is authored and approved outside
-    engineering. `intervention_modules.approved` gates it.
+  - **S4** — intervention content is authored and approved outside engineering.
+    `intervention_modules.approved` gates it.
+
+    > **S4 amended 2026-09-09, by the product owner.** The original read:
+    > *"clinical technique content is authored and approved outside
+    > engineering."* It required clinical review for all intervention content,
+    > which left no route to approve general wellbeing material.
+    >
+    > **What the amendment allows.** Content offered as **general wellbeing
+    > content** may be approved by the **product owner / content owner**, where
+    > that person holds relevant wellbeing or mindfulness training. That
+    > approval covers product intent, wording, tone, delivery direction, and use
+    > within ELSEA. It is a real approval and sufficient for that class of
+    > content.
+    >
+    > **What the amendment does not touch.** Content that is presented as
+    > clinical or therapeutic, that names a clinical technique as such, that
+    > claims to treat or diagnose, or that addresses a person in crisis, still
+    > requires clinical review. So does anything reached through the safety
+    > diversion. S3, S13, S14, S15 and S16 are unchanged.
+    >
+    > **The approving capacity must be recorded** alongside the content, so that
+    > "approved" is never an undifferentiated flag with no author. See
+    > `nervous-ready-production-pack.md` for the shape of that record.
+    >
+    > **No code changed.** `intervention_modules.approved` remains the gate; the
+    > validator still rejects an approved module with no audio; and nothing in
+    > the schema or the composer knows who approved anything — that was true
+    > before this amendment and is true after it.
 
 ### Commercial — the eight profitability rules
 
@@ -753,7 +780,7 @@ the validator and importer expect.
 | Modules | 5 |
 | Author status | DRAFT COMPLETE |
 | Product + content approval | **APPROVED** — product owner / content owner, 2026-09-09, as general wellbeing content |
-| Clinical review | **NOT CLAIMED / NOT RECORDED** |
+| Clinical review | **NOT CLAIMED** — not required for this content class under S4 as amended |
 | `technique_key` | **proposed**, five of five — none clinically confirmed |
 | Recording | **NOT RECORDED** |
 | `approved` | **false**, five of five — the flag gates playback, not review; it flips at import once audio exists |
@@ -989,9 +1016,12 @@ silently removes the five-minute session from `wired_sleep`.
 
 ### Then, in order
 
-1. Content review of the five drafts, and clinical review including the five
-   proposed technique keys and the `intensity` question.
-2. Approval — the only thing that makes content selectable.
+1. ~~Content review, clinical review~~ — **done 2026-09-09.** Approved by the
+   product owner as general wellbeing content under S4 as amended. Technique
+   keys remain proposed and `intensity` is still open; neither blocks
+   recording.
+2. ~~Approval~~ — **granted.** The `approved` flag flips at import, once audio
+   exists.
 3. Record to the audio specification; update `duration_seconds` to the measured
    lengths and set `approved` true for what passed.
 4. Validate the manifest with `--audio-dir` — `ffmpeg` required, see §8.
