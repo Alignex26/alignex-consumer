@@ -166,6 +166,13 @@ for (const [index, m] of modules.entries()) {
     fail(key, 'approved must be explicitly true or false');
   }
 
+  // Version — how replacement audio is published. Optional (a first import is
+  // version 1), but if given it must be a positive integer, because it becomes
+  // an immutable history row and part of a saved session's identity.
+  if (m.version !== undefined && (!Number.isInteger(m.version) || m.version < 1)) {
+    fail(key, 'version, if given, must be a positive integer');
+  }
+
   // --- media ---------------------------------------------------------------
   if (!audioDir) continue;
   const file = join(audioDir, basename(m.storage_path ?? ''));

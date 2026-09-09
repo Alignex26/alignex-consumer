@@ -161,6 +161,10 @@ const rows = modules.map((m) => ({
   intensity: m.intensity ?? 5,
   requires_headphones: m.requires_headphones === true,
   is_bed: m.is_bed === true,
+  // Bumping this is how an author publishes replacement audio: the module row
+  // is updated in place, and the previous version survives as its own
+  // immutable row. Defaulting to 1 keeps a first import simple.
+  version: m.version ?? 1,
   approved: m.approved === true,
   approved_at: m.approved === true ? new Date().toISOString() : null,
   updated_at: new Date().toISOString(),
@@ -177,5 +181,53 @@ if (!result.ok) {
   process.exit(1);
 }
 
+// --- immutable version rows ------------------------------------------------
+//
+// WHY THIS IS NOT OPTIONAL. `intervention_modules` is a CURRENT pointer: the
+// row is updated in place on re-import, so replacing a module's audio
+// overwrites the only record of what the previous version was. A session saved
+// against the old audio would then replay different content under the same
+// name, which is precisely what "exact" must not mean.
+//
+// `intervention_module_versions` is the history, and it has to be written at
+// the moment of import. It cannot be reconstructed later — once the module row
+// has moved on, the old storage path and duration are simply gone.
+//
+// Append-only, so a re-import of an unchanged version is a duplicate and is
+// ignored rather than being an error. Bumping `version` in the manifest is
+// what publishes a new one.
+const imported = JSON.parse(result.body);
+const versionRows = imported.map((row) => ({
+  module_id: row.id,
+  version: row.version,
+  storage_path: row.storage_path,
+  duration_seconds: row.duration_seconds,
+  technique_key: row.technique_key,
+  approved_at: row.approved ? row.approved_at : null,
+}));
+
+const versionResult = await rest(
+  '/rest/v1/intervention_module_versions?on_conflict=module_id,version',
+  {
+    method: 'POST',
+    headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+    body: JSON.stringify(versionRows),
+  }
+);
+
+if (!versionResult.ok) {
+  console.error(
+    `\n  Module rows were written, but the version history was not:\n` +
+    `  ${versionResult.status} ${versionResult.body}\n\n` +
+    `  Fix this before importing again. Without version rows an exact replay\n` +
+    `  cannot be rebuilt, and re-importing will overwrite the only record of\n` +
+    `  what the current audio was.\n`
+  );
+  process.exit(1);
+}
+
+const newVersions = JSON.parse(versionResult.body).length;
+
 console.log(`\n  Uploaded ${uploaded} file(s). Wrote ${rows.length} module row(s).`);
+console.log(`  Recorded ${newVersions} new version row(s); ${versionRows.length - newVersions} already present.`);
 console.log(`  ${approvedCount} are approved and therefore selectable.\n`);

@@ -34,6 +34,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // assembling the manifest here would leave the bed, the ordinals and the
 // manifest wrapper duplicated — tests green, production subtly different.
 import { compose } from "../_shared/compose.ts";
+// Recording WHAT was composed, so that a freshness policy has a history to read
+// when one is decided. This applies no policy: nothing here deprioritises a
+// module, and no recency weighting is active. See the migration
+// `20260909180000_persist_fingerprint.sql`.
+import { manifestFingerprint } from "../_shared/novelty.ts";
 import { BUDGET_NORMAL_SECONDS } from "../_shared/speech.ts";
 import type {
   InterventionModule,
@@ -80,6 +85,9 @@ type ModuleRow = {
   intensity: number;
   requires_headphones: boolean;
   is_bed: boolean;
+  /** The CURRENT content version. Part of a manifest's identity: replacing a
+   *  module's audio makes a session built from it a different experience. */
+  version: number;
 };
 
 function json(body: unknown, status = 200): Response {
@@ -163,6 +171,7 @@ async function persistManifest(
   admin: ReturnType<typeof createClient>,
   userId: string | null,
   manifest: SessionManifest,
+  fingerprint: string,
 ): Promise<string | null> {
   if (!userId) return null;
 
@@ -180,6 +189,7 @@ async function persistManifest(
       p_duration_seconds: manifest.durationSeconds,
       p_recipe_version: manifest.recipeVersion,
       p_dynamic_seconds: manifest.dynamicSeconds,
+      p_fingerprint: fingerprint,
       p_segments: manifest.segments.map((segment) => ({
         ordinal: segment.ordinal,
         kind: segment.kind,
@@ -277,7 +287,7 @@ Deno.serve(async (req: Request) => {
   const { data: moduleRows } = await admin
     .from("intervention_modules")
     .select(
-      "id, module_key, family, technique_key, storage_path, duration_seconds, intensity, requires_headphones, is_bed",
+      "id, module_key, family, technique_key, storage_path, duration_seconds, intensity, requires_headphones, is_bed, version",
     )
     .eq("is_active", true)
     .eq("approved", true);
@@ -362,7 +372,13 @@ Deno.serve(async (req: Request) => {
 
   if (signed.size !== paths.length) return fail("audio_unavailable");
 
-  const manifestId = await persistManifest(admin, userId, manifest);
+  // The composition's identity, built from the module versions actually used.
+  // Recorded, not acted upon: no recency penalty is applied anywhere in this
+  // function, and none will be until the lookback and weighting are decided.
+  const versions = new Map(modules.map((row) => [row.id, row.version]));
+  const fingerprint = manifestFingerprint(manifest, versions);
+
+  const manifestId = await persistManifest(admin, userId, manifest, fingerprint);
 
   return json({
     ok: true,
