@@ -26,6 +26,9 @@ Companions:
     writer, clinical reviewer and voice producer actually work from. These
     are the handable documents; the `tranche-*.md` files above are their
     source workings.
+  - **`nervous-ready-production-pack.md`** — the first pack: five draft
+    scripts with proposed technique keys, awaiting content and clinical
+    review. Its manifest is `content/nervous-ready-tranche-1.draft.json`.
 
 This file is the inventory and the state of play.
 
@@ -62,7 +65,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `05d288a` |
+| Tip | `9c54c7e` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 11 migrations applied |
@@ -480,16 +483,19 @@ Every module `nervous_ready` needs, with the durations to author to. Taken from
 [`content-authoring-brief-tranche-1.md`](./content-authoring-brief-tranche-1.md),
 which carries the full authoring sheets, content rules and open decisions.
 
-**Nothing below has been started.** No module has been authored, approved,
-recorded or imported.
+**Drafted, not approved.** All five load-bearing modules now have author-draft
+wording and proposed technique keys in
+[`nervous-ready-production-pack.md`](./nervous-ready-production-pack.md).
+None is approved, none is recorded, and nothing has been imported. The six
+depth modules have not been started.
 
 | Module | Family | Target duration | Cross-recipe ceiling | Used by other recipes | Status |
 |---|---|---|---|---|---|
-| `nr_arrive_short` | `orient` | 20s or under | **≤21s** | yes — all five recipes open with `orient` | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
-| `nr_regulate_short` | `regulate` | 45s or under | **≤45s** | yes — 4 phases across recipes | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
-| `nr_reframe_short` | `reframe` | 40s or under | **≤40s** | yes — 5 phases | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
-| `nr_prepare_short` | `prepare` | 45s or under | **≤45s** | yes — 4 phases | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
-| `nr_close_short` | `close` | 11s or under | **≤11s** | yes — all five recipes close | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+| `nr_arrive_short` | `orient` | 20s or under | **≤21s** | yes — all five recipes open with `orient` | **DRAFTED** · key proposed · NOT APPROVED · not recorded |
+| `nr_regulate_short` | `regulate` | 45s or under | **≤45s** | yes — 4 phases across recipes | **DRAFTED** · key proposed · NOT APPROVED · not recorded |
+| `nr_reframe_short` | `reframe` | 40s or under | **≤40s** | yes — 5 phases | **DRAFTED** · key proposed · NOT APPROVED · not recorded |
+| `nr_prepare_short` | `prepare` | 45s or under | **≤45s** | yes — 4 phases | **DRAFTED** · key proposed · NOT APPROVED · not recorded |
+| `nr_close_short` | `close` | 11s or under | **≤11s** | yes — all five recipes close | **DRAFTED** · key proposed · NOT APPROVED · not recorded |
 | `nr_regulate_long` | `regulate` | up to 254s — REQUIRED | not stated for depth modules | yes | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
 | `nr_ground_mid` | `ground` | up to 254s — REQUIRED | not stated for depth modules | yes | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
 | `nr_reframe_long` | `reframe` | up to 203s — REQUIRED | not stated for depth modules | yes | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
@@ -734,6 +740,65 @@ Prototype, not production-ready: `SWEEP_GAIN`, `RESOLVE_GAIN`, the −26 LUFS
 target, the carrier tones and the two-sweep placement are all engineering
 defaults awaiting a sound-design judgement.
 
+## 6f. The first production content pack
+
+The five load-bearing `nervous_ready` modules have author-draft wording.
+[`nervous-ready-production-pack.md`](./nervous-ready-production-pack.md) carries
+the scripts, delivery directions and per-module status;
+`content/nervous-ready-tranche-1.draft.json` is the manifest in the exact schema
+the validator and importer expect.
+
+| | |
+|---|---|
+| Modules | 5 |
+| Author status | DRAFT COMPLETE |
+| Content approval | **PENDING** |
+| Clinical approval | **PENDING** |
+| `technique_key` | **proposed**, five of five |
+| Recording | **NOT RECORDED** |
+| `approved` | **false**, five of five |
+| Structural validation | PASS (records only — no audio to check) |
+| Import | dry run only; nothing written, nothing uploaded |
+
+### The duration finding, and two cuts
+
+Estimating speaking time against each ceiling caught one script that could not
+be delivered: `nr_regulate_short` asked for **three extended-exhale cycles**,
+and those cycles are the technique — each needs roughly eight seconds of real
+silence, not merely words spoken.
+
+| | Words | Cycles | @130wpm | @110wpm | |
+|---|---:|---:|---:|---:|---|
+| As first drafted | 70 | 3 | 56.3s | 62.2s | over |
+| After cutting the third cycle | 67 | 2 | 46.9s | 52.5s | still over |
+| After cutting the closing sentences | 44 | 2 | **36.3s** | **40.0s** | fits |
+
+Both cuts were content decisions, made by the user and applied here.
+
+It took two because they remove different things: a breath cycle is eight
+seconds of silence but only three words, while the closing sentences are 23
+words and no silence. The first cut took out the larger single component and
+still left the module over, because the words were the rest of it.
+
+**All five scripts now fit.** `nr_close_short` fits at 8–10s against 11, with
+under three seconds of headroom — worth timing in the booth.
+
+These are estimates at 130 and 110 words per minute, not measurements. The real
+number comes from recording, and `duration_seconds` must be updated to it.
+
+### Two fields deliberately not filled
+
+**`intensity`** is omitted from the manifest: it is clinical, the scale is
+undefined anywhere in the system, and inventing a number would fabricate a
+clinical value. **The importer defaults an absent value to `5`**, which would
+land in the database looking like a judgement — so either supply real values
+before import or defer deliberately, knowing what gets written.
+
+**`duration_seconds`** currently holds each module's *ceiling* rather than a
+measured length. It is the only honest value available before recording and is
+wrong the moment audio exists; the validator's 0.25s tolerance will reject it,
+which is the correct outcome.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
@@ -886,8 +951,11 @@ started.
 Everything else in §8 is real, but only one thing moves ELSEA toward a playable
 session. Stated here so it is not lost among the rest.
 
-> **Commission the five load-bearing `nervous_ready` modules — authored,
-> approved, and recorded to cross-recipe ceilings.**
+> **Get the five drafted `nervous_ready` scripts through content and clinical
+> review, then recorded.**
+>
+> Drafting is done — see §6f. What stands between here and a real session is
+> now review, approval and a recording session, none of which is engineering.
 
 | Module | Family | Duration | Why this length |
 |---|---|---:|---|
@@ -897,8 +965,10 @@ session. Stated here so it is not lost among the rest.
 | `nr_prepare_short` | `prepare` | **≤45s** | tightest `prepare` slot anywhere |
 | `nr_close_short` | `close` | **≤11s** | `wired_sleep.close` — the hardest constraint in the product |
 
-Each needs a real `technique_key` from clinical, an explicit `approved: true`,
-and audio to the spec in §5, delivered as `<module_key>.m4a`.
+Each still needs a **confirmed** `technique_key` from clinical (five are
+proposed, none confirmed), an explicit `approved: true`, and audio to the spec
+in §5, delivered as `<module_key>.m4a`. All five drafts fit these ceilings on
+estimate; the measured lengths replace `duration_seconds` at import.
 
 **Why five and not eleven, or forty-seven.** Removing any one of these five
 makes a five-minute session fail with `phase_unfilled` — all five are
@@ -919,19 +989,26 @@ silently removes the five-minute session from `wired_sleep`.
 
 ### Then, in order
 
-1. Validate the manifest — `ffmpeg` required, see §8.
-2. Dry-run the import, read the plan.
-3. Commit the import with a service-role key: uploads audio, writes module rows
+1. Content review of the five drafts, and clinical review including the five
+   proposed technique keys and the `intensity` question.
+2. Approval — the only thing that makes content selectable.
+3. Record to the audio specification; update `duration_seconds` to the measured
+   lengths and set `approved` true for what passed.
+4. Validate the manifest with `--audio-dir` — `ffmpeg` required, see §8.
+5. Dry-run the import, read the plan.
+6. Commit the import with a service-role key: uploads audio, writes module rows
    and their immutable version rows.
-4. **First real composition** — the composer selects approved modules for the
+7. **First real composition** — the composer selects approved modules for the
    first time.
-5. **First manifest persisted** — never executed before.
-6. **First real session played on-device**, and with it pause, resume, early
-   exit, timing and outcome against real audio.
-7. Resolve whatever that surfaces, then FUNCTIONALLY COMPLETE can be declared.
+8. **First manifest persisted** — never executed before.
+9. **First real session played on-device**, and with it pause, resume, early
+   exit, timing, outcome, and the sound layer, against real audio.
+10. Resolve whatever that surfaces, then FUNCTIONALLY COMPLETE can be declared.
 
-Steps 4 to 6 are the untested stretch. Everything before them has now been
-exercised; see §6d.
+Steps 7 to 9 are the untested stretch. Everything before them has now been
+exercised; see §6d. Step 9 is also the first time the sound layer will be heard
+at all — it lives in the manifest player, which is dormant until a manifest
+exists (§6e).
 
 ## 9. Working on it
 
