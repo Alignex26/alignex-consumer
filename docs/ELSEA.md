@@ -752,11 +752,11 @@ the validator and importer expect.
 |---|---|
 | Modules | 5 |
 | Author status | DRAFT COMPLETE |
-| Content approval | **PENDING** |
+| Content approval | **GRANTED** — product owner, 2026-09-09 |
 | Clinical approval | **PENDING** |
-| `technique_key` | **proposed**, five of five |
+| `technique_key` | **proposed**, five of five — none clinically confirmed |
 | Recording | **NOT RECORDED** |
-| `approved` | **false**, five of five |
+| `approved` | **false**, five of five — the flag gates playback, not review; it flips at import once audio exists |
 | Structural validation | PASS (records only — no audio to check) |
 | Import | dry run only; nothing written, nothing uploaded |
 

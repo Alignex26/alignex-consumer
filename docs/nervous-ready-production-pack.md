@@ -6,11 +6,19 @@ clinical review.
 Prepared: 2026-09-09. Draft manifest:
 [`content/nervous-ready-tranche-1.draft.json`](../content/nervous-ready-tranche-1.draft.json)
 
-> **NOTHING HERE IS APPROVED.** Every script below is **author draft**, every
-> `technique_key` is **proposed**, and `approved` is **false** in every record.
-> No audio has been recorded, nothing has been imported, and no service-role
-> key has been used. Approval is a decision made outside engineering and has
-> not been made.
+> **CONTENT APPROVED 2026-09-09. CLINICAL REVIEW STILL OUTSTANDING.**
+>
+> The five scripts below were approved by the product owner on 2026-09-09.
+> That is the content decision, and it is recorded as given.
+>
+> **Clinical sign-off has not been recorded**, and the five `technique_key`
+> values remain **proposed** — naming a technique is the clinical call, not a
+> content one. No audio has been recorded, nothing has been imported, and no
+> service-role key has been used.
+>
+> `approved` remains **false** in the manifest. That flag is not the content
+> decision: it is what makes a module *playable to a person*, and it cannot be
+> true before the audio exists — see "Why the manifest flag is still false".
 
 ---
 
@@ -20,11 +28,12 @@ Prepared: 2026-09-09. Draft manifest:
 |---|---|
 | Modules | 5 |
 | Author status | **DRAFT COMPLETE** |
-| Content approval | **PENDING** |
+| Content approval | **GRANTED** — product owner, 2026-09-09 |
 | Clinical approval | **PENDING** |
+| `technique_key` | **proposed** — five of five, none confirmed |
 | Recording status | **NOT RECORDED** |
 | Audio validation | **NOT RUN** |
-| `approved` flag | **false** — all five |
+| `approved` flag | **false** — all five; see below |
 | Structural validation | **PASS** (records only; no audio to check) |
 | Import | **dry run only** — nothing written, nothing uploaded |
 
@@ -79,6 +88,37 @@ headroom. Time it in the booth before the take is called good.
 
 ---
 
+---
+
+## Why the manifest flag is still false
+
+Content approval and the `approved` flag are two different things, and only one
+of them has been decided.
+
+**The content decision is made.** The wording is signed off.
+
+**The flag is not a review outcome.** In the deployed composer it is the gate
+on selection:
+
+```
+.eq("is_active", true)
+.eq("approved", true)
+```
+
+Setting it true says *this may be played to a person now*. There is no audio to
+play: the storage paths point at objects that do not exist, so the composer
+would select all five, fail to sign their URLs, and return `audio_unavailable`
+— failing the whole composition rather than the current clean `library_empty`.
+
+So the flag flips at **import**, once masters exist and have passed technical
+validation, and it flips because content approval was granted — not instead of
+it. The validator enforces the same thing from the other side: an approved
+module with no audio file is a hard failure.
+
+**Clinical review is still outstanding**, and the five `technique_key` values
+are proposed rather than confirmed. Naming a technique is a clinical act, and
+no clinician has named these.
+
 ## The five modules
 
 ### 1 — `nr_arrive_short`
@@ -90,7 +130,7 @@ headroom. Time it in the booth before the take is called good.
 | Maximum duration | **21 seconds** |
 | Proposed `technique_key` | `present_moment_orienting` |
 | Author status | DRAFT COMPLETE |
-| Content approval | PENDING |
+| Content approval | **GRANTED** 2026-09-09 |
 | Clinical approval | PENDING |
 | Recording | NOT RECORDED |
 | Audio validation | NOT RUN |
@@ -117,7 +157,7 @@ meditative.
 | Maximum duration | **45 seconds** |
 | Proposed `technique_key` | `extended_exhale_release` |
 | Author status | DRAFT COMPLETE |
-| Content approval | PENDING |
+| Content approval | **GRANTED** 2026-09-09 |
 | Clinical approval | PENDING |
 | Recording | NOT RECORDED |
 | Audio validation | NOT RUN |
@@ -157,7 +197,7 @@ breathing prompts without exceeding 45 seconds.
 | Maximum duration | **40 seconds** |
 | Proposed `technique_key` | `nervous_energy_reappraisal` |
 | Author status | DRAFT COMPLETE |
-| Content approval | PENDING |
+| Content approval | **GRANTED** 2026-09-09 |
 | Clinical approval | PENDING |
 | Recording | NOT RECORDED |
 | Audio validation | NOT RUN |
@@ -189,7 +229,7 @@ reassurance or therapy.
 | Maximum duration | **45 seconds** |
 | Proposed `technique_key` | `first_action_rehearsal` |
 | Author status | DRAFT COMPLETE |
-| Content approval | PENDING |
+| Content approval | **GRANTED** 2026-09-09 |
 | Clinical approval | PENDING |
 | Recording | NOT RECORDED |
 | Audio validation | NOT RUN |
@@ -225,7 +265,7 @@ Still controlled and grounded.
 | Maximum duration | **11 seconds** |
 | Proposed `technique_key` | `readiness_transition_cue` |
 | Author status | DRAFT COMPLETE |
-| Content approval | PENDING |
+| Content approval | **GRANTED** 2026-09-09 |
 | Clinical approval | PENDING |
 | Recording | NOT RECORDED |
 | Audio validation | NOT RUN |
@@ -309,9 +349,9 @@ The library remains empty and `compose` still answers `library_empty`.
 1. ~~Content decision on `nr_regulate_short`~~ — **resolved 2026-09-09** over
    two cuts: the third breath cycle, then the closing two sentences. Now
    estimated 36–40s against a 45s ceiling. All five scripts fit.
-2. **Content review** of all five scripts.
+2. ~~Content review~~ — **granted 2026-09-09.**
 3. **Clinical review**, including confirmation or replacement of the five
-   proposed `technique_key` values and a decision on `intensity`.
+   proposed `technique_key` values and a decision on `intensity`. **Outstanding.**
 4. **Approval** — the only thing that makes content selectable.
 5. **Record** to the audio specification: AAC-LC `.m4a`, 44.1 kHz, mono,
    96 kbps, −16 LUFS ±1, ≤ −1 dBTP, ≤100 ms head and tail silence, no fades.
