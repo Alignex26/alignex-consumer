@@ -20,8 +20,12 @@ Companions:
     and delivery requirements for recorded masters.
   - [`tranche-nervous-ready.md`](./tranche-nervous-ready.md),
     [`tranche-wound-up-home.md`](./tranche-wound-up-home.md) and
-    [`tranche-remaining-three.md`](./tranche-remaining-three.md) — the content
-    briefs, written for an author who does not read code.
+    [`tranche-remaining-three.md`](./tranche-remaining-three.md) — the
+    engineering-side computations behind the content briefs.
+  - **`content-authoring-brief-tranche-1.md` … `-5.md`** — the five briefs a
+    writer, clinical reviewer and voice producer actually work from. These
+    are the handable documents; the `tranche-*.md` files above are their
+    source workings.
 
 This file is the inventory and the state of play.
 
@@ -34,12 +38,12 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 354 passing across 14 suites |
+| Tests | 357 passing across 14 suites |
 | TypeScript | clean |
 | Lint | clean |
 | Migrations | 11 written, **all applied** |
 | Edge functions | `interpret` and `compose` deployed and current (`npm run deploy:check`) |
-| Deployment parity | verified — marker at `1cfe45f`, matches `main` |
+| Deployment parity | current — marker `1cfe45f`; every commit since is documentation, and no function *source* has changed (only the marker file itself, which the check excludes) |
 | Audio content | **none exists** |
 | Blocking | approved intervention content and audio. All 5 recipes specified. |
 
@@ -58,7 +62,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `1cfe45f` |
+| Tip | `658c94c` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 11 migrations applied |
@@ -337,7 +341,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 354 across 14 suites
+### Tests — 357 across 14 suites
 
 | Suite | Covers |
 |---|---|
@@ -441,6 +445,64 @@ tightest slot in ANY recipe that uses it, not the recipe it was written for. A
 whose `close` gets 11s — and that recipe then has no five-minute session at
 all. Family coverage looks like composability and is not.
 
+## 6c. The content authoring programme — all five briefs written
+
+Every recipe now has a brief a writer, clinical reviewer and voice producer can
+work from without reading any code:
+`content-authoring-brief-tranche-1.md` through `-5.md`.
+
+They contain no intervention content and propose none. Every content, clinical
+and approval field is left empty and marked REQUIRED.
+
+### The shape of the programme
+
+Writing all five together showed something none of them shows alone: **families
+are introduced in Tranches 1, 2 and 4 only.**
+
+| Tranche | Recipe | New families | The real work |
+|---|---|---:|---|
+| 1 | `nervous_ready` | 8 | the whole core |
+| 2 | `wound_up_home` | 3 (`release`, `transition`, `settle`) | 2 new core modules, if T1 is authored to cross-recipe limits |
+| 3 | `scattered_focused` | **0** | `focus` depth — it spans three phases |
+| 4 | `wired_sleep` | 1 (`sleep`, the twelfth and last) | the `sleep` family, and the 11s close |
+| 5 | `flat_go` | **0** | two short `activate` and `prepare` variants |
+
+Tranches 3 and 5 introduce no families at all; their work is depth in families
+that already exist. Each tranche should therefore cost less than the one before
+— **but only if modules are authored to their cross-recipe ceilings**, which is
+still an open decision from Tranche 1 and is the one worth settling before any
+recording begins.
+
+### The product-wide duration ceilings
+
+Set by four different recipes, and not previously written down together. A
+module intended to serve every recipe must fit the tightest slot anywhere:
+
+| Family | Ceiling | Set by |
+|---|---:|---|
+| `close` / `sleep` | **11s** | `wired_sleep.close` |
+| `orient` | **21s** | `flat_go.arrive` |
+| `ground`, `reframe`, `focus`, `settle` | **40s** | various |
+| `regulate`, `release`, `activate`, `prepare` | **45s** | various |
+| `transition` | **55s** | `wound_up_home.leave_work_behind` |
+
+A module written to a single recipe's looser limit works there and nowhere
+else. It fails silently — nothing errors, it is simply never selected.
+
+### Constraints each brief had to carry
+
+- **`wired_sleep`** allocates its `close` phase **11 seconds**. Without a module
+  that fits, the recipe has no five-minute session at all. The measured
+  consequence: 7 distinct sessions in 30 simulated repeats, one module in every
+  single one. Recorded as a content decision with the three supported options
+  and no recommendation, because no approved freshness threshold exists.
+- **`flat_go`** has the only single-family phase in the product (`wake_body`,
+  `activate` only), and `activate` is eligible in three phases. That
+  combination already broke composition at 300s once; the fix was a second
+  short variant in `activate` and `prepare`, and both are marked load-bearing.
+- **`scattered_focused`** can consume three distinct `focus` modules in one
+  session, and holds the largest slot anywhere at 402s.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
@@ -500,8 +562,10 @@ Engineering has taken this as far as it legitimately can without content.
    technique, wording, delivery, and a `technique_key` per module.
 2. `intensity` semantics — the column is 1–10 and read by nothing; what a 3
    means versus an 8 is undefined.
-3. Audio format — no codec, sample rate, bitrate, channel count or loudness
-   target is documented anywhere.
+3. ~~Audio format~~ — **resolved.** Specified in
+   [`audio-production-spec.md`](./audio-production-spec.md) and enforced by
+   the validator: AAC-LC in `.m4a`, 44.1kHz mono, 96kbps, −16 LUFS ±1,
+   −1 dBTP, ≤100ms head and tail silence, no baked-in fades.
 4. Whether 20–30% silence in a five-minute session is acceptable. If not, the
    answer is more short modules.
 5. Whether `wired_sleep` gets more short `close` modules, or whether one
@@ -516,10 +580,17 @@ Engineering has taken this as far as it legitimately can without content.
    made from evidence.
 3. Whether the freshness in §7 is acceptable for someone using this daily.
 
-**From design:** the screen pass. Two questions from the device walk are still
-open — a state pill routes to the correction screen rather than into a session,
-and someone arriving `tired_wired` sees one enabled target card and five
-dimmed.
+**From design:** the screen pass. The two questions from the device walk were
+examined during the functional completion pass and **neither is a defect**:
+
+- A chip on its own routes to the correction screen because a chip carries no
+  free text for the safety gate to read, so there is nothing to interpret and
+  the person picks instead. The journey completes; `/time` guards on the
+  interpretation, not on the safety flag, so there is no dead end. Whether
+  that screen should be *presented* as a correction is a design question.
+- Someone arriving `tired_wired` sees one enabled target because the approved
+  transition map contains exactly one route from that state. Showing five
+  dimmed cards is a presentation choice, not a functional fault.
 
 **From engineering, once content exists:** validate and import the manifest,
 upload masters to the private bucket, set `approved`, watch manifest
