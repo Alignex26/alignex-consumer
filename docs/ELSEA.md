@@ -62,7 +62,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `5f2e4eb` |
+| Tip | `05d288a` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 11 migrations applied |
@@ -662,8 +662,10 @@ Engineering has taken this as far as it legitimately can without content.
 
 **From content and clinical — the blocker:**
 
-1. The 47 modules in [`module-inventory-v1.md`](./module-inventory-v1.md):
-   technique, wording, delivery, and a `technique_key` per module.
+1. **The five load-bearing `nervous_ready` modules first** — not all 47. They
+   are what makes a real session exist at all; see §8c. The full 47 are in
+   [`module-inventory-v1.md`](./module-inventory-v1.md), and each needs
+   technique, wording, delivery and a `technique_key`.
 2. `intensity` semantics — the column is 1–10 and read by nothing; what a 3
    means versus an 8 is undefined.
 3. ~~Audio format~~ — **resolved.** Specified in
@@ -701,6 +703,16 @@ upload masters to the private bucket, set `approved`, watch manifest
 persistence execute for the first time, wire novelty into the composer once
 the weightings above are decided, then the dynamic speech layer when a
 provider is chosen.
+
+**Two environment prerequisites, neither of them optional:**
+
+- **`ffmpeg` and `ffprobe` on the importing machine.** Installed here on
+  2026-09-09 (Gyan 9.0.1, via winget), but on the user PATH — a shell must be
+  restarted to see it. Without them the importer refuses to commit.
+- **A service-role key**, supplied in the environment for that one command
+  and never added to `.env`. Not available on this machine, which is why
+  upload, insert, version rows, composer selection and persistence are still
+  unexercised.
 
 ## 8b. Functional completion status
 
@@ -741,6 +753,58 @@ allocator, with no repeated module in any manifest.
 exists. These two are tracked separately on purpose: the first is an
 engineering result and is finished; the second is a content result and has not
 started.
+
+## 8c. The critical path — the single next action
+
+Everything else in §8 is real, but only one thing moves ELSEA toward a playable
+session. Stated here so it is not lost among the rest.
+
+> **Commission the five load-bearing `nervous_ready` modules — authored,
+> approved, and recorded to cross-recipe ceilings.**
+
+| Module | Family | Duration | Why this length |
+|---|---|---:|---|
+| `nr_arrive_short` | `orient` | **≤21s** | tightest `arrive` slot in the product (`flat_go`) |
+| `nr_regulate_short` | `regulate` | **≤45s** | tightest `regulate` slot anywhere |
+| `nr_reframe_short` | `reframe` | **≤40s** | tightest `reframe` slot anywhere |
+| `nr_prepare_short` | `prepare` | **≤45s** | tightest `prepare` slot anywhere |
+| `nr_close_short` | `close` | **≤11s** | `wired_sleep.close` — the hardest constraint in the product |
+
+Each needs a real `technique_key` from clinical, an explicit `approved: true`,
+and audio to the spec in §5, delivered as `<module_key>.m4a`.
+
+**Why five and not eleven, or forty-seven.** Removing any one of these five
+makes a five-minute session fail with `phase_unfilled` — all five are
+load-bearing. The other six in the tranche change how a session *feels*, not
+whether it exists. Five is the smallest package that produces a real playable
+session.
+
+**Why the cross-recipe durations.** Shorter always works; longer never does. At
+21/45/40/45/11 these five serve **all five recipes**. At `nervous_ready`'s own
+limits (22/71/54/57/16) they serve one, and the other four tranches each need
+their own. Same recording session, roughly four times the coverage — and the
+choice cannot be corrected afterwards without re-recording.
+
+**The eleven-second close is the one to sanity-check before booking studio
+time.** If a closing thought cannot land in 11 seconds, that is a genuine
+finding to raise. It must not be solved by overrunning: a 12-second module
+silently removes the five-minute session from `wired_sleep`.
+
+### Then, in order
+
+1. Validate the manifest — `ffmpeg` required, see §8.
+2. Dry-run the import, read the plan.
+3. Commit the import with a service-role key: uploads audio, writes module rows
+   and their immutable version rows.
+4. **First real composition** — the composer selects approved modules for the
+   first time.
+5. **First manifest persisted** — never executed before.
+6. **First real session played on-device**, and with it pause, resume, early
+   exit, timing and outcome against real audio.
+7. Resolve whatever that surfaces, then FUNCTIONALLY COMPLETE can be declared.
+
+Steps 4 to 6 are the untested stretch. Everything before them has now been
+exercised; see §6d.
 
 ## 9. Working on it
 
