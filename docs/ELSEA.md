@@ -38,7 +38,7 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 362 passing across 14 suites |
+| Tests | 435 passing across 15 suites |
 | TypeScript | clean |
 | Lint | clean |
 | Migrations | 11 written, **all applied** |
@@ -341,7 +341,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 362 across 14 suites
+### Tests — 435 across 15 suites
 
 | Suite | Covers |
 |---|---|
@@ -359,6 +359,7 @@ All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 | `novelty-replay.test.ts` | Fingerprints, recency bounds, exact replay, withdrawal handling, cross-user isolation. |
 | `novelty-simulation.test.ts` | 30 repeated sessions per recipe; reports freshness, asserts no target. |
 | `schema-reachability.test.ts` | That every schema object has a writer, or is recorded as deliberately unwritten. |
+| `spatial-audio.test.ts` | The sound layer: duration is untouchable, every layer stops together, absent assets degrade to voice-only, and no claim is made. |
 
 ---
 
@@ -607,6 +608,132 @@ the untested part of the path.
 build 9.0.1, via winget). It is on the user PATH but a shell must be restarted
 to see it. Without it the importer refuses to commit.
 
+## 6e. The V1 sound layer
+
+Three reusable stereo assets that sit around the spoken modules: an ambient
+bed, one spatial movement, one centred resolve. Prototype sound design, not
+intervention content.
+
+### The three assets
+
+| Asset | Length | What it does |
+|---|---:|---|
+| `nervous_ready_bed_v1.m4a` | 20s | Ambient bed. Loops under the whole session. |
+| `spatial_sweep_soft_v1.m4a` | 4s | Moves LEFT → CENTRE → RIGHT → CENTRE → LEFT. |
+| `centre_resolve_soft_v1.m4a` | 2s | Centred, does not move. Plays as the session ends. |
+
+All three: AAC, 44.1 kHz, **stereo**, ~64 kbps, mastered to **−26 LUFS** — ten
+decibels under the voice reference of −16, so the layer is present without
+competing. Measured, not assumed: the generator prints codec, rate, channels,
+bitrate, loudness and true peak for each, and reports any check it could not
+run as SKIPPED rather than folding it into a pass.
+
+Movement verified by measuring the two channels separately across the sweep:
+**+20 dB left-biased** at 0.4s, crossing centre near 1.7s, **−39 dB** (right)
+at 2.8s, returning. The resolve measures **0.00 dB** difference between
+channels — centred by construction.
+
+### How they are produced
+
+`node scripts/generate-sound-assets.mjs [--force]`, deterministically, from
+ffmpeg synthesis primitives. There is no master to lose and no DAW in the loop:
+delete the files and run it again.
+
+They live in **`assets/audio/sound-design/`** and are bundled with the app.
+
+### Why the movement is baked in
+
+There is no runtime panning anywhere in this project and none was added. That
+would mean a DSP layer, a native dependency and a per-frame budget in the
+middle of a session. The pan is rendered into a stereo file offline; the device
+starts a file and stops a file.
+
+### Overlay, never timeline
+
+**The sound layer cannot change what a session is.** `buildTimeline` takes a
+manifest and nothing else — the layer is not one of its inputs and cannot
+become one. Sweeps and the resolve play on their own player, fire-and-forget,
+and nothing reads back from it: not `elapsed`, not `cueIndex`, not completion.
+A sweep still sounding when the session ends is cut with it, exactly as the bed
+is.
+
+All twenty recipe/duration cases still finish at exactly 300 / 600 / 900 /
+1200 seconds, asserted with the layer in place.
+
+### Where sweeps fall
+
+At **most two per session**, on phase boundaries only: the first boundary
+(leaving `arrive`) and the middle one. Never the last — movement immediately
+before a centred resolve reads as a mistake rather than an ending. A sweep at
+every boundary would be six in a long session, which stops being a transition
+and becomes a mannerism.
+
+That placement is a **two-line rule, not a sequencing engine**, and it is an
+engineering default: which boundaries are *right* is a sound-design judgement
+nobody has made.
+
+### Fallback
+
+Each layer is independently optional and separately guarded:
+
+```
+voice + bed + spatial  →  voice + bed  →  voice only
+```
+
+A missing or failing asset resolves to null and is skipped. **A sound-design
+failure never sends a session back to the silent catalogue** — that fallback
+turns on the composition failing, which is a different thing entirely. The
+session screen has no knowledge of the sound layer and cannot fall back because
+of one.
+
+A bed carried by an approved manifest outranks the bundled one; the bundled bed
+is the fallback for a recipe that has none, which today is every recipe.
+
+### Headphones
+
+Not required and not detected. Stereo is naturally stronger on headphones and
+the session remains usable on a speaker.
+
+### No claims
+
+The carrier tones are **engineering parameters**: 110 Hz and its octave for the
+bed, chosen because they are low, unobtrusive and divide exactly into 20
+seconds so the loop has no seam. Nothing here treats, entrains or affects
+anyone, and nothing in the product may say otherwise. A test forbids the
+tokens that could only appear as a claim.
+
+### The boundary against intervention content
+
+The layer has three URI fields and nothing else — no `technique_key`, no
+approval flag, no clinical meaning, and no field for anything a person typed.
+It never enters the intervention module table or the private bucket, and the
+importer and composer have no knowledge of it.
+
+> The existing client-source guard in `approval-gate.test.ts` forbids the
+> private bucket's literal name anywhere under `src/`, comments included. That
+> guard caught this work during the pass — a disclaimer in `sound-layer.ts`
+> named the bucket in order to say it was not used. The comment was reworded
+> rather than the guard weakened.
+
+### What is proven, and what is not
+
+**Proven:** the assets exist, regenerate deterministically, and measure as
+specified; the pan is real and measured; duration is unaffected across all
+twenty cases; every layer stops together on pause, unmount and early exit;
+absent assets degrade to voice-only. 73 tests.
+
+**NOT proven — and cannot be yet.** The sound layer lives in
+`use-manifest-player.ts`, which runs only when a manifest exists. The composer
+returns `library_empty`, so `session.tsx` passes it null and the catalogue path
+plays instead. **The sound layer has never been heard in the app, on any
+device, and cannot be until approved content lands.** An emulator is attached
+but is not a surface on which stereo movement through headphones can be
+demonstrated.
+
+Prototype, not production-ready: `SWEEP_GAIN`, `RESOLVE_GAIN`, the −26 LUFS
+target, the carrier tones and the two-sweep placement are all engineering
+defaults awaiting a sound-design judgement.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
@@ -819,6 +946,7 @@ npx supabase db push                    # apply pending migrations
 npx supabase functions deploy compose   # deploy the composer
 node scripts/modules-validate.mjs FILE  # check a content manifest
 node scripts/modules-import.mjs FILE    # dry run; needs a flag to write
+node scripts/generate-sound-assets.mjs  # rebuild the sound layer
 ```
 
 Notes for whoever picks this up:

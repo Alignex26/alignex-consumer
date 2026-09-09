@@ -3,6 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { buildTimeline, edgeGain, type CueSource, type Timeline, type TimelineFault } from '@/audio/timeline';
+import {
+  RESOLVE_GAIN,
+  SOUND_LAYER,
+  SWEEP_GAIN,
+  sweepPointsFor,
+  type SoundLayer,
+} from '@/audio/sound-layer';
 import type { PlaybackStatus } from '@/types/elsea';
 import type { SessionManifest } from '@/types/session-engine';
 
@@ -115,7 +122,16 @@ const defaultResolver: CueResolver = async (source) => {
 
 export function useManifestPlayer(
   manifest: SessionManifest | null,
-  resolver: CueResolver = defaultResolver
+  resolver: CueResolver = defaultResolver,
+  /**
+   * The ambient bed and spatial movement. Bundled app assets, never
+   * intervention content — see `sound-layer.ts`.
+   *
+   * Entirely optional. Every field may be null, and a null layer plays the
+   * voice-only session the player already knew how to play. Nothing about
+   * timing, duration or completion depends on it.
+   */
+  soundLayer: SoundLayer = SOUND_LAYER
 ): ManifestPlayback {
   const built = useMemo(() => (manifest ? buildTimeline(manifest) : null), [manifest]);
   const timeline: Timeline | null = built?.ok ? built.timeline : null;
@@ -137,6 +153,17 @@ export function useManifestPlayer(
   const playerA = useAudioPlayer(null);
   const playerB = useAudioPlayer(null);
   const bedPlayer = useAudioPlayer(null);
+  /**
+   * The spatial layer: one-shot sweeps and the closing resolve.
+   *
+   * A player of its own, because these OVERLAY the timeline rather than taking
+   * a place in it. That is the whole reason spatial effects cannot lengthen a
+   * session: the timeline is built from foreground cues alone and remains the
+   * only thing that decides when the session ends. A sweep that is still
+   * sounding when its cue ends is simply cut with the session, exactly as the
+   * bed is.
+   */
+  const spatialPlayer = useAudioPlayer(null);
   const statusA = useAudioPlayerStatus(playerA);
   const statusB = useAudioPlayerStatus(playerB);
 
@@ -182,7 +209,10 @@ export function useManifestPlayer(
 
       if (cancelled) return;
       setUris(resolved);
-      setBedUri(bed);
+      // A bed carried by the manifest wins: it is approved content chosen for
+      // this recipe. The bundled ambient bed is the fallback for when the
+      // recipe has none, which today is always, because no bed module exists.
+      setBedUri(bed ?? soundLayer.bedUri);
       setResolving(false);
     };
 
@@ -190,14 +220,17 @@ export function useManifestPlayer(
     return () => {
       cancelled = true;
     };
-  }, [timeline, resolver]);
+  }, [timeline, resolver, soundLayer]);
 
   // ---- Reconcile the players to the intent -------------------------------
   useEffect(() => {
     if (!timeline || !uris) return;
 
     if (!wantsPlay) {
-      for (const player of [playerA, playerB, bedPlayer]) {
+      // EVERY layer stops, not just the voice. A bed or a sweep still
+      // sounding after a pause is the clearest possible sign that pause did
+      // not mean what it said.
+      for (const player of [playerA, playerB, bedPlayer, spatialPlayer]) {
         try {
           player.pause();
         } catch {
@@ -264,6 +297,7 @@ export function useManifestPlayer(
     playerA,
     playerB,
     bedPlayer,
+    spatialPlayer,
   ]);
 
   // ---- The tick: position, volumes, and advancing ------------------------
@@ -315,6 +349,59 @@ export function useManifestPlayer(
     return () => clearInterval(id);
   }, [wantsPlay, timeline, uris, cueIndex, activeStatus, activePlayer, bedPlayer]);
 
+  // ---- The spatial layer --------------------------------------------------
+  //
+  // Fire-and-forget, and deliberately so. Nothing below reads back from this
+  // player, waits on it, or lets it influence `elapsed`, `cueIndex` or when the
+  // session ends. It is an overlay: if it fails, is missing, or is still
+  // sounding when the session finishes, the session is unaffected.
+  const sweepPoints = useMemo(
+    () => (timeline ? sweepPointsFor(timeline) : []),
+    [timeline]
+  );
+
+  useEffect(() => {
+    if (!wantsPlay || !soundLayer.sweepUri) return;
+    if (!sweepPoints.includes(cueIndex)) return;
+
+    try {
+      spatialPlayer.replace({ uri: soundLayer.sweepUri });
+      setGain(spatialPlayer, SWEEP_GAIN);
+      spatialPlayer.seekTo(0);
+      spatialPlayer.play();
+    } catch {
+      // A session without its sweep is still a session.
+    }
+    // Keyed on the cue, so a sweep fires once when a phase opens rather than on
+    // every tick within it.
+  }, [wantsPlay, cueIndex, sweepPoints, soundLayer.sweepUri, spatialPlayer]);
+
+  /**
+   * Whether the closing resolve has already sounded.
+   *
+   * A ref rather than state on purpose: nothing renders differently because of
+   * it, and setting state inside this effect would cascade a render for a fact
+   * only the effect cares about. Read and written inside the effect only, never
+   * during render.
+   */
+  const resolvePlayed = useRef(false);
+  const reachedEnd = timeline !== null && elapsed >= timeline.totalSeconds;
+
+  useEffect(() => {
+    if (!reachedEnd || resolvePlayed.current) return;
+    resolvePlayed.current = true;
+
+    if (!soundLayer.resolveUri) return;
+    try {
+      spatialPlayer.replace({ uri: soundLayer.resolveUri });
+      setGain(spatialPlayer, RESOLVE_GAIN);
+      spatialPlayer.seekTo(0);
+      spatialPlayer.play();
+    } catch {
+      // As above.
+    }
+  }, [reachedEnd, soundLayer.resolveUri, spatialPlayer]);
+
   // ---- Interruptions ------------------------------------------------------
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
@@ -328,8 +415,9 @@ export function useManifestPlayer(
   // ---- Cleanup ------------------------------------------------------------
   useEffect(() => {
     return () => {
-      // Leaving the screen must never leave a bed playing behind it.
-      for (const player of [playerA, playerB, bedPlayer]) {
+      // Leaving the screen must never leave a bed or a sweep playing behind
+      // it. Early exit reaches here by unmounting the session screen.
+      for (const player of [playerA, playerB, bedPlayer, spatialPlayer]) {
         try {
           player.pause();
         } catch {
@@ -337,7 +425,7 @@ export function useManifestPlayer(
         }
       }
     };
-  }, [playerA, playerB, bedPlayer]);
+  }, [playerA, playerB, bedPlayer, spatialPlayer]);
 
   const play = useCallback(() => {
     if (!timeline || resolving || fault) return;
