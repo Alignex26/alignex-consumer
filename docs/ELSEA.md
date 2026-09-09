@@ -29,7 +29,7 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 130 passing across 7 suites |
+| Tests | 133 passing across 7 suites |
 | TypeScript | clean |
 | Lint | 1 pre-existing error in `src/hooks/use-color-scheme.web.ts` (Expo starter, web-only, untouched) |
 | Migrations | 7 written, **all applied** |
