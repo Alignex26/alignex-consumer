@@ -473,6 +473,40 @@ that already exist. Each tranche should therefore cost less than the one before
 still an open decision from Tranche 1 and is the one worth settling before any
 recording begins.
 
+### Tranche 1 module status — the commissioning list
+
+Every module `nervous_ready` needs, with the durations to author to. Taken from
+[`content-authoring-brief-tranche-1.md`](./content-authoring-brief-tranche-1.md),
+which carries the full authoring sheets, content rules and open decisions.
+
+**Nothing below has been started.** No module has been authored, approved,
+recorded or imported.
+
+| Module | Family | Target duration | Cross-recipe ceiling | Used by other recipes | Status |
+|---|---|---|---|---|---|
+| `nr_arrive_short` | `orient` | 20s or under | **≤21s** | yes — all five recipes open with `orient` | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+| `nr_regulate_short` | `regulate` | 45s or under | **≤45s** | yes — 4 phases across recipes | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+| `nr_reframe_short` | `reframe` | 40s or under | **≤40s** | yes — 5 phases | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+| `nr_prepare_short` | `prepare` | 45s or under | **≤45s** | yes — 4 phases | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+| `nr_close_short` | `close` | 11s or under | **≤11s** | yes — all five recipes close | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+| `nr_regulate_long` | `regulate` | up to 254s — REQUIRED | not stated for depth modules | yes | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+| `nr_ground_mid` | `ground` | up to 254s — REQUIRED | not stated for depth modules | yes | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+| `nr_reframe_long` | `reframe` | up to 203s — REQUIRED | not stated for depth modules | yes | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+| `nr_prepare_long` | `prepare` | up to 400s — REQUIRED | not stated for depth modules | yes | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+| `nr_activate_mid` | `activate` | up to 400s — REQUIRED | not stated for depth modules | yes | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+| `nr_focus_mid` | `focus` | up to 251s — REQUIRED | not stated for depth modules | yes | TO AUTHOR · TO DECIDE · NOT APPROVED · TO RECORD |
+
+**The first five are the milestone.** Approved, recorded and imported, they make
+`nervous_ready` compose and play at all four durations — ELSEA's first real
+session. The other six change how a session feels, not whether it exists.
+
+The cross-recipe ceilings are the durations to author to if one recording is to
+serve every recipe. Authored instead to `nervous_ready`'s own looser limits
+(22 / 71 / 54 / 57 / 16s) each module works in this recipe alone, and the other
+four tranches need their own. **That is open decision 10 in the brief and it is
+the one worth settling before recording starts**, because it cannot be corrected
+afterwards without re-recording.
+
 ### The product-wide duration ceilings
 
 Set by four different recipes, and not previously written down together. A
