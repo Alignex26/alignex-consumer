@@ -1,7 +1,7 @@
 /// <reference types="node" />
 
 import { execFileSync } from 'child_process';
-import { mkdtempSync, writeFileSync, readFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -287,5 +287,93 @@ describe('the audio spec agrees with the tooling', () => {
     const pattern = ['^modules', '[a-z]+', '[a-z0-9_]+'].join('\\/');
     expect(VALIDATOR_SOURCE).toContain(pattern);
     expect(SPEC).toContain('modules/<family>/<module_key>.m4a');
+  });
+});
+
+describe('a skipped audio check is never an import-ready pass', () => {
+  /**
+   * Found by exercising the pipeline end to end with a fixture.
+   *
+   * Without ffprobe the only thing verified about a file is that it exists and
+   * is not empty -- a text file renamed `.m4a` passes. The validator was
+   * nonetheless printing "PASS -- nothing blocking import", which contradicts
+   * its own stated principle that a skipped check is never reported as a pass,
+   * and is exactly how non-conforming masters would reach the private bucket
+   * and fail on someone's device after a tranche had been recorded.
+   *
+   * The contract is now three-valued:
+   *   0  records valid; audio either verified or never claimed
+   *   1  records invalid
+   *   2  records valid, audio NOT verified
+   */
+  const withAudio = (records: unknown[], files: Record<string, string>) => {
+    const dir = mkdtempSync(join(tmpdir(), 'elsea-audio-'));
+    const audio = join(dir, 'audio');
+    mkdirSync(audio);
+    for (const [name, body] of Object.entries(files)) writeFileSync(join(audio, name), body);
+    const file = join(dir, 'manifest.json');
+    writeFileSync(file, JSON.stringify(records));
+    try {
+      const output = execFileSync(process.execPath, [VALIDATOR, file, '--audio-dir', audio], {
+        encoding: 'utf8',
+      });
+      return { code: 0, output };
+    } catch (error) {
+      const e = error as { status: number; stdout?: string; stderr?: string };
+      return { code: e.status, output: `${e.stdout ?? ''}${e.stderr ?? ''}` };
+    }
+  };
+
+  const hasFfprobe = (() => {
+    try {
+      execFileSync('ffprobe', ['-version'], { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  it('exits 0 when no audio directory is given, claiming nothing about audio', () => {
+    // Records-only validation is a legitimate use and must stay clean.
+    expect(validate([valid()]).code).toBe(0);
+  });
+
+  it('does not report an unverified master as import-ready', () => {
+    const result = withAudio([valid()], { 'probe_module.m4a': 'not audio' });
+
+    if (hasFfprobe) {
+      // With ffprobe present the text file is properly rejected as bad media.
+      expect(result.code).toBe(1);
+      return;
+    }
+
+    // Without it, the records are valid but nothing about the audio is known.
+    expect(result.code).toBe(2);
+    expect(result.output).toContain('audio itself was NOT verified');
+    expect(result.output).not.toContain('nothing blocking import');
+  });
+
+  it('still names what it skipped rather than staying quiet', () => {
+    const result = withAudio([valid()], { 'probe_module.m4a': 'not audio' });
+    if (hasFfprobe) return;
+    expect(result.output).toContain('SKIPPED');
+  });
+
+  it('reports invalid records as a failure, not as unverified audio', () => {
+    // Exit 1 must win over exit 2: a bad record is a hard failure whether or
+    // not the audio could be checked.
+    const result = withAudio([valid({ family: 'invented' })], { 'probe_module.m4a': 'x' });
+    expect(result.code).toBe(1);
+  });
+
+  it('the importer refuses to commit unverified audio unless overridden', () => {
+    const IMPORTER = join(__dirname, '..', '..', 'scripts', 'modules-import.mjs');
+    const source = readFileSync(IMPORTER, 'utf8');
+
+    // The guard applies to --commit only: a dry run writes nothing, so seeing
+    // the plan with unchecked audio is useful rather than dangerous.
+    expect(source).toContain('audioUnverified && commit && !allowUnverified');
+    expect(source).toContain('--allow-unverified-audio');
+    expect(source).toContain('error?.status === 2');
   });
 });

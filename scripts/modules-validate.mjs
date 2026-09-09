@@ -229,6 +229,24 @@ if (skipped.length) {
 }
 
 if (problems.length === 0) {
+  // A pass with skipped media checks is NOT the same as a pass. Without
+  // ffprobe the only thing verified about a file is that it exists and is not
+  // empty — a text file renamed `.m4a` gets through. Saying "nothing blocking
+  // import" there contradicts this script's own principle that a skipped check
+  // is never reported as a pass, and it is how non-conforming audio would
+  // reach the private bucket and fail on someone's device.
+  //
+  // Exit 2 means: the records are valid, and the audio was not verified.
+  // The importer refuses to --commit on 2 unless explicitly overridden.
+  if (audioDir && skipped.length > 0) {
+    console.log(
+      `\n  INCOMPLETE — records are valid, but the audio itself was NOT verified.` +
+      `\n  Install ffmpeg and re-run before importing, or import with` +
+      `\n  --allow-unverified-audio if you accept unchecked masters.\n`
+    );
+    process.exit(2);
+  }
+
   console.log(`\n  PASS — nothing blocking import.\n`);
   process.exit(0);
 }

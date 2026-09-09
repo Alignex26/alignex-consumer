@@ -26,6 +26,7 @@ import { join, basename } from 'node:path';
 const args = process.argv.slice(2);
 const manifestPath = args.find((a) => !a.startsWith('--'));
 const commit = args.includes('--commit');
+const allowUnverified = args.includes('--allow-unverified-audio');
 const audioDirIndex = args.indexOf('--audio-dir');
 const audioDir = audioDirIndex >= 0 ? args[audioDirIndex + 1] : null;
 
@@ -38,14 +39,35 @@ if (!manifestPath) {
 
 // --- validate first, always ------------------------------------------------
 console.log('\n  Validating before anything is touched...');
+let audioUnverified = false;
 try {
   execFileSync(
     process.execPath,
     ['scripts/modules-validate.mjs', manifestPath, ...(audioDir ? ['--audio-dir', audioDir] : [])],
     { stdio: 'inherit' }
   );
-} catch {
-  console.error('  Validation failed. Nothing was imported.\n');
+} catch (error) {
+  // Exit 2 is "records valid, audio not verified" — a real state, not a
+  // failure. Anything else is a genuine validation failure.
+  if (error?.status === 2) {
+    audioUnverified = true;
+  } else {
+    console.error('  Validation failed. Nothing was imported.\n');
+    process.exit(1);
+  }
+}
+
+// A dry run may proceed unverified: it writes nothing, and seeing the plan is
+// the point. A real import may not, because uploading unchecked masters is how
+// a recorded tranche reaches a device and fails there.
+if (audioUnverified && commit && !allowUnverified) {
+  console.error(
+    `\n  Refusing to import: the audio was never technically verified.\n` +
+    `\n  Install ffmpeg and re-run, so codec, sample rate, channels, bitrate,\n` +
+    `  duration, loudness and true peak are actually checked. Without it the\n` +
+    `  only thing known about each file is that it exists and is not empty.\n` +
+    `\n  If you genuinely accept unchecked masters, pass --allow-unverified-audio.\n`
+  );
   process.exit(1);
 }
 

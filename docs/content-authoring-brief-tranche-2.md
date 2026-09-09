@@ -630,8 +630,19 @@ SUPABASE_SERVICE_ROLE_KEY=... node scripts/modules-import.mjs <manifest.json> --
 The import validates first and refuses on any failure. Audio uploads before
 rows are written, so a module row never points at audio that is not there.
 
-> Loudness checks need `ffmpeg` on the machine running the validator. Without
-> it those checks report as **skipped**, never as passed.
+> **ffmpeg is required to import.** The audio checks — codec, sample rate,
+> channels, bitrate, duration, loudness and true peak — all need `ffmpeg` and
+> `ffprobe` on the machine running the validator. Without them the only thing
+> known about a file is that it exists and is not empty: **a text file renamed
+> `.m4a` passes.**
+>
+> So the validator reports those checks as **skipped, never as passed**, and
+> **the importer refuses to `--commit`** until they have actually run. A dry run
+> still works, because it writes nothing.
+>
+> Install ffmpeg before delivery. Importing unchecked masters is possible only
+> by passing `--allow-unverified-audio` deliberately, and it is how
+> non-conforming audio reaches a device after a tranche has been recorded.
 
 ---
 

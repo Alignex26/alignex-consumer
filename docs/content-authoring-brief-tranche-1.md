@@ -671,10 +671,19 @@ The import validates first and refuses to proceed on any failure. Audio is
 uploaded before rows are written, so a module row never exists pointing at
 audio that is not there.
 
-> **Note on loudness checks.** They require `ffmpeg` on the machine running the
-> validator. Where it is missing, the validator reports those checks as
-> **skipped** — never as passed. Make sure the machine used for the real check
-> has it.
+> **ffmpeg is required to import.** The audio checks — codec, sample rate,
+> channels, bitrate, duration, loudness and true peak — all need `ffmpeg` and
+> `ffprobe` on the machine running the validator. Without them the only thing
+> known about a file is that it exists and is not empty: **a text file renamed
+> `.m4a` passes.**
+>
+> So the validator reports those checks as **skipped, never as passed**, and
+> **the importer refuses to `--commit`** until they have actually run. A dry run
+> still works, because it writes nothing.
+>
+> Install ffmpeg before delivery. Importing unchecked masters is possible only
+> by passing `--allow-unverified-audio` deliberately, and it is how
+> non-conforming audio reaches a device after a tranche has been recorded.
 
 ---
 
