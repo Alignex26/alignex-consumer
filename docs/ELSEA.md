@@ -34,12 +34,12 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 336 passing across 13 suites |
+| Tests | 354 passing across 14 suites |
 | TypeScript | clean |
 | Lint | clean |
-| Migrations | 10 written, **all applied** |
+| Migrations | 11 written, 10 applied, **1 pending** (`20260909180000`) |
 | Edge functions | `interpret` and `compose` deployed and current (`npm run deploy:check`) |
-| Deployment parity | verified — marker at `175dfbd2`, matches `main` |
+| Deployment parity | **STALE** — `compose` changed and has not been redeployed |
 | Audio content | **none exists** |
 | Blocking | approved intervention content and audio. All 5 recipes specified. |
 
@@ -58,10 +58,10 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `9d631db` |
+| Tip | `b7a03a0` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
-| Database | all 10 migrations applied |
+| Database | 10 of 11 migrations applied; `20260909180000` is written but **not applied** |
 
 The repository, the database and the deployed functions are in agreement for
 the first time since the completion pass. An earlier version of this section
@@ -276,7 +276,7 @@ over on its own when approved content lands.
 Nothing here invents content. The validator's job is to refuse a manifest that
 would put unapproved or placeholder material in front of a person.
 
-### Database — 10 migrations, all applied
+### Database — 11 migrations, 10 applied
 
 | Migration | Applied |
 |---|---|
@@ -290,6 +290,7 @@ would put unapproved or placeholder material in front of a person.
 | `20260909100000_private_intervention_audio` | yes |
 | `20260909140000_ingestion_and_atomic_manifest` | yes |
 | `20260909160000_novelty_and_saved_sessions` | yes |
+| `20260909180000_persist_fingerprint` | **no — pending** |
 
 Catalogue era: `transitions`, `sessions_catalogue`, `session_segments`,
 `safety_events`, `user_sessions`, `session_outcomes`.
@@ -336,7 +337,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 336 across 13 suites
+### Tests — 354 across 14 suites
 
 | Suite | Covers |
 |---|---|
@@ -353,6 +354,7 @@ All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 | `ingestion.test.ts` | The content ingestion contract, validator and importer. |
 | `novelty-replay.test.ts` | Fingerprints, recency bounds, exact replay, withdrawal handling, cross-user isolation. |
 | `novelty-simulation.test.ts` | 30 repeated sessions per recipe; reports freshness, asserts no target. |
+| `schema-reachability.test.ts` | That every schema object has a writer, or is recorded as deliberately unwritten. |
 
 ---
 
@@ -464,12 +466,18 @@ Stated plainly so none is mistaken for finished work.
   `supabase/functions/deno-ambient.d.ts`. It does NOT verify calls against the
   real supabase-js signatures, because there is no `deno` here and tsc cannot
   resolve a `jsr:` specifier. Do not read a clean run as full Deno type safety.
-- **Novelty is deployed but dormant.** `_shared/novelty.ts` and
-  `_shared/replay.ts` are written, tested and on the server, but the composer
-  does not call them: nothing reads a person's recent fingerprints yet, and no
-  session is currently made fresher by any of it. Wiring it in is blocked on
-  two product decisions — the recency window, and how novelty should weigh
-  against measured effectiveness — recorded in `session-engine.md`.
+- **Novelty records but does not act.** The composer now computes a manifest
+  fingerprint and persists it, so a freshness policy will have a history to
+  read when one is decided. It applies **no** recency: it imports no policy
+  constant, reads no prior fingerprints, and deprioritises nothing, and
+  `schema-reachability.test.ts` asserts each of those. Activating it is
+  blocked on two product decisions — the recency window, and how novelty
+  weighs against measured effectiveness.
+- **`_shared/replay.ts` is unreachable from the product.** Exact replay and
+  reuse-intent are written and tested, but nothing saves a session, so there
+  is nothing to replay. `saved_sessions` has no writer for the same reason.
+  Whether the saved/replay journey is in V1 is a scope decision that has not
+  been made, and a writer was not invented for it.
 - **`wired_sleep` has a content variety problem, not a code problem.** Over 30
   simulated repeat sessions it produced 7 distinct compositions, and
   `sleep_10s` appeared in **all 30**, because it is the only module short
@@ -518,6 +526,46 @@ upload masters to the private bucket, set `approved`, watch manifest
 persistence execute for the first time, wire novelty into the composer once
 the weightings above are decided, then the dynamic speech layer when a
 provider is chosen.
+
+## 8b. Functional completion status
+
+**NOT FUNCTIONALLY COMPLETE.** One thing prevents it, and it is not code.
+
+The definition agreed for this pass requires a real person to reach a real
+composed session and **hear approved audio**. `intervention_modules` is empty,
+so the composer returns `library_empty` and every session falls back to the
+silent catalogue path. A silent fallback does not count, a test fixture is not
+production content, and neither is treated as though it were.
+
+**Has the real session engine ever played an approved audio composition
+on-device? No.** It has never played any audio at all, because none exists.
+
+### What is genuinely working
+
+Verified by execution, not by the presence of code: the safety gate and its
+fail-closed behaviour; the flow graph and its route guards; the deployed
+composer's three failure paths; the recipe and module lockdown under RLS; the
+private audio bucket; the catalogue fallback end to end on a device, including
+pause; and the twenty recipe/duration composition cases through the real
+allocator.
+
+### What is built but unexercised
+
+Manifest persistence has never executed — it needs an approved module. The
+multi-segment player has never played a real manifest, for the same reason.
+The importer has never run against real content. The fingerprint now written
+by the composer has never been written in production, because the migration
+that accepts it is not yet applied.
+
+### The engine/audio distinction
+
+**ENGINE PROVEN** — all 20 recipe/duration cases compose through the real
+allocator, with no repeated module in any manifest.
+
+**REAL AUDIO PLAYBACK PROVEN** — no. Cannot be marked until approved content
+exists. These two are tracked separately on purpose: the first is an
+engineering result and is finished; the second is a content result and has not
+started.
 
 ## 9. Working on it
 
