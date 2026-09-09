@@ -116,6 +116,85 @@ cascades from the user, so deleting an account erases its cost history.
 Whether anonymised or aggregate cost should outlive an account is a
 data-retention decision and has not been made here.
 
+## Freshness and replay
+
+> **Fresh by default. Repeat on purpose.**
+
+Two behaviours that look alike and must never share a code path.
+
+**Accidental repetition** is the composer serving the same experience twice
+because the library is small. Ordinary composition works against it: a person's
+recently heard modules are deprioritised, and a freshly composed manifest whose
+fingerprint matches a recent one can be recomposed rather than served.
+
+**Intentional replay** is someone asking for a session they saved because it
+worked. That must not be defeated by the machinery preventing the first.
+
+### Manifest fingerprint
+
+A stable identity for the meaningful composition: the recipe, plus the ordered
+module identities and their content versions.
+
+It deliberately excludes **signed URLs** — they expire in two hours and differ
+on every request, so including them would make every session unique and the
+freshness check inert while appearing to work. It also excludes silence,
+offsets and total duration: the same modules in the same order at five and ten
+minutes are the same experience at two lengths, and treating them as distinct
+would let the composer repeat itself by varying the length.
+
+### Recency
+
+`applyRecency` lowers the score of recently heard modules, decaying across a
+lookback window. Two properties matter:
+
+- **It never bans a module.** The penalty is bounded and floored, so the single
+  most effective module for someone stays reachable even if they heard it
+  yesterday. Rule 8 says the person hears what works for them; a freshness
+  mechanism that could override that would be trading effectiveness for variety
+  without anyone deciding to.
+- **It cannot outweigh real evidence.** The maximum penalty is smaller than the
+  gap between a proven and an unrated module, so novelty reorders equals.
+
+> **PRODUCT DECISION REQUIRED — recency policy.** The defaults (5 sessions,
+> 0.15 max penalty) are chosen so the mechanism can be exercised, not because
+> they are right. What counts as recent, and how novelty should weigh against
+> measured effectiveness, are open. `novelty-simulation.test.ts` exists so the
+> decision can be made from evidence.
+
+### Exact replay
+
+Reproduces the saved module **versions**, not whatever the module rows point at
+now. That distinction is the whole of "exact": replacing a module's approved
+audio must not silently change a session somebody saved.
+
+Novelty is bypassed, because the repetition is the point. **Approval is not.**
+If a saved version has been withdrawn, or its module de-approved or
+deactivated, exact replay fails explicitly and names what went. It never
+substitutes another module and calls the result exact — that would be a quiet
+lie about the one thing the feature promises.
+
+Signed URLs are never stored. They are regenerated on each replay.
+
+### Reuse this
+
+Carries only the intent — which transition, how long — and lets the ordinary
+composer do the rest. Withdrawn content is replaced rather than fatal,
+effectiveness still applies, and novelty still applies: someone reusing a shape
+deserves a fresh arrangement of it. If they wanted the identical thing they
+would have asked for the exact replay.
+
+### Content versioning
+
+`intervention_module_versions` holds an immutable row per approved version.
+`intervention_modules.version` alone was insufficient: it is mutable in place,
+so replacing a module's audio and bumping the number leaves no record of what
+the old one was, and an exact replay would deliver different content under the
+same name.
+
+The table is append-only by trigger, with one exception: a version may be
+marked withdrawn, which is the mechanism that makes an affected exact replay
+fail rather than mislead.
+
 ## Hard invariants
 
 These are properties of the system, enforced in code and covered by tests.
@@ -128,6 +207,9 @@ These are properties of the system, enforced in code and covered by tests.
 - **The dynamic budget is enforced at composition**, before any provider call.
   A manifest that exceeds the ceiling is rejected, not trimmed silently.
 - **A manifest never contains a whole pre-rendered session.** Rule 2.
+- **No module plays twice in one session**, and no ordinary composition should
+  reproduce a recent one. Exact replay is the deliberate exception and bypasses
+  novelty only — never approval.
 - **The safety gate stays upstream of everything here.** Nothing in this engine
   may be reached from raw input without passing it.
 - **The decision engine is server-side only.** Nothing under `src/` imports

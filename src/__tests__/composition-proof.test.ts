@@ -105,7 +105,7 @@ export const LIBRARY: InterventionModule[] = INVENTORY.map(([family, seconds]) =
   isBed: false,
 }));
 
-function phasesFor(recipe: string): RecipePhase[] {
+export function phasesForRecipe(recipe: string): RecipePhase[] {
   return PHASES.filter((p) => p.recipe === recipe)
     .sort((a, b) => a.ordinal - b.ordinal)
     .map((p) => ({
@@ -123,7 +123,7 @@ export function modulesByPhaseFor(
   library: InterventionModule[] = LIBRARY
 ): Record<string, InterventionModule[]> {
   const out: Record<string, InterventionModule[]> = {};
-  for (const p of phasesFor(recipe)) {
+  for (const p of phasesForRecipe(recipe)) {
     const families = ELIGIBILITY.filter((e) => e.recipe === recipe && e.phase === p.phase)
       .map((e) => e.family);
     out[p.phase] = library.filter((m) => families.includes(m.family));
@@ -135,7 +135,7 @@ export function composeFor(recipe: string, seconds: number, library = LIBRARY) {
   return compose({
     transitionKey: recipe,
     durationSeconds: seconds,
-    phases: phasesFor(recipe),
+    phases: phasesForRecipe(recipe),
     modulesByPhase: modulesByPhaseFor(recipe, library),
   });
 }
@@ -160,7 +160,7 @@ describe('all twenty recipe/duration cases compose', () => {
         expect(new Set(ids).size).toBe(ids.length);
 
         // Every phase stayed inside its approved band.
-        for (const phase of phasesFor(recipe)) {
+        for (const phase of phasesForRecipe(recipe)) {
           const spent = manifest.segments
             .filter((s) => s.kind !== 'generated' && s.phase === phase.phase)
             .reduce((n, s) => n + s.durationSeconds, 0);
