@@ -12,7 +12,7 @@
 // exactly as given and is never inferred, defaulted or upgraded.
 
 import { readFileSync, existsSync, statSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { join, basename } from 'node:path';
 
 /** The twelve approved families. Must match `_shared/types.ts`. */
@@ -92,24 +92,45 @@ function probe(file) {
 }
 
 function loudness(file) {
-  // ffmpeg writes the loudnorm JSON summary to stderr.
+  // ffmpeg writes the loudnorm JSON summary to stderr, and — this is the part
+  // that was wrong — it writes it on a SUCCESSFUL run. `-f null -` analyses and
+  // exits 0.
+  //
+  // The previous version only parsed stderr inside a catch block, so the
+  // success path returned null every time and every file was reported as
+  // "loudness could not be measured". The check had never executed. It failed
+  // honestly rather than silently, which is the only reason it was survivable,
+  // but it meant the loudness and true-peak limits in the audio spec were
+  // never enforced on anything.
+  //
+  // spawnSync rather than execFileSync because stderr is needed on success,
+  // and execFileSync returns only stdout.
+  const result = spawnSync(
+    'ffmpeg',
+    ['-hide_banner', '-i', file, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'],
+    { encoding: 'utf8' }
+  );
+
+  const text = `${result.stderr ?? ''}`;
+  const start = text.lastIndexOf('{');
+  if (start < 0) return null;
+
+  // Slice to the CLOSING brace, not to the end of stderr. ffmpeg writes
+  // progress and muxing lines after the JSON summary, and including them made
+  // JSON.parse throw — which the catch below then swallowed as "could not be
+  // measured", indistinguishable from ffmpeg being absent.
+  const end = text.indexOf('}', start);
+  if (end < 0) return null;
+
   try {
-    execFileSync('ffmpeg', ['-i', file, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'],
-      { encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'] });
+    const parsed = JSON.parse(text.slice(start, end + 1));
+    const integrated = Number(parsed.input_i);
+    const truePeak = Number(parsed.input_tp);
+    // A digitally silent file reports -inf, which is not a measurement.
+    if (!Number.isFinite(integrated) || !Number.isFinite(truePeak)) return null;
+    return { integrated, truePeak };
+  } catch {
     return null;
-  } catch (error) {
-    const text = String(error.stderr ?? '');
-    const start = text.lastIndexOf('{');
-    if (start < 0) return null;
-    try {
-      const parsed = JSON.parse(text.slice(start));
-      return {
-        integrated: Number(parsed.input_i),
-        truePeak: Number(parsed.input_tp),
-      };
-    } catch {
-      return null;
-    }
   }
 }
 
