@@ -20,7 +20,7 @@ Companions:
 
 This file is the inventory and the state of play.
 
-Last updated: 2026-09-08.
+Last updated: 2026-09-09.
 
 ---
 
@@ -35,7 +35,7 @@ Last updated: 2026-09-08.
 | Migrations | 7 written, **all applied** |
 | Edge functions | `interpret` and `compose` both **deployed** |
 | Audio content | **none exists** |
-| Blocking | the intervention-module library |
+| Blocking | the intervention-module library — 2 of 5 recipes specified |
 
 **The product runs end to end today** on the catalogue path, as a correctly
 timed session with no sound. The whole flow — safety gate, interpretation,
@@ -343,6 +343,53 @@ Probed, not assumed:
   the only target offered was Sleep, and only "Rested" was enabled.
 
 ---
+
+## 6b. Content coverage — audited 2026-09-09
+
+Two of the five recipes have a content specification. The other three do not.
+
+| Recipe | Spec | Minimum modules | Silence at 300 / 600 / 900 / 1200 |
+|---|---|---:|---|
+| `nervous_ready` | [tranche](./tranche-nervous-ready.md) | 5 | 8 / 54 / 69 / 77% |
+| `wound_up_home` | [tranche](./tranche-wound-up-home.md) | 5 | 3 / 44 / 63 / 72% |
+| `scattered_focused` | — | — | — |
+| `wired_sleep` | — | — | — |
+| `flat_go` | — | — | — |
+
+Both minimums are five modules, and both are roughly 70% silence at twenty
+minutes with only the minimum. Around eleven brings each into the 12–20% range.
+
+### Modules do share between recipes, but less than the count suggests
+
+**Seven modules serve both specified recipes**, against ten if nothing were
+shared — `orient`, `regulate` and `close` do double duty when each is sized to
+the *tighter* of the two requirements.
+
+That sharing does not extend as far as it looks. The same seven compose
+`nervous_ready` and `wound_up_home` and **fail all three of the others** at 300
+seconds.
+
+### The trap: family coverage does not mean composability
+
+`wired_sleep` has an eligible family present for every one of its phases with
+that seven-module set, and still fails. Its `close` phase is allocated **11
+seconds**; the shared `close` module is 16, sized for the two recipes already
+specified, and 16 will not fit into 11.
+
+So a module shared across recipes must be sized to the **tightest slot in any
+recipe that uses it**, not the tightest in the recipe it was written for. A
+`close` module intended to serve all five has to be ≤11s.
+
+Checking family eligibility alone will say a recipe is covered when it is not.
+Only running `compose` proves it.
+
+### The thirty-module figure is optimistic
+
+`module-library.md` sketches an inventory of thirty across all twelve families.
+On the evidence of two specified recipes — five each as a floor, around eleven
+each to be usable, and only partial sharing between them — **the realistic
+total is likely closer to forty than thirty.** Not a reason to change anything
+yet; a reason not to treat thirty as a budget.
 
 ## 7. Known gaps
 
