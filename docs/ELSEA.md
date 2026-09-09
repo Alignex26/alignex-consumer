@@ -65,7 +65,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `9c54c7e` |
+| Tip | `eb36be1` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 11 migrations applied |
