@@ -16,6 +16,10 @@
 // HOW IT WORKS. `supabase/functions/DEPLOYED` records the commit that was last
 // deployed. This compares it to HEAD. No secrets, no network, no dependencies.
 //
+// The marker lives inside the directory it watches, so it is excluded from the
+// comparison — otherwise recording a deploy is itself a change since the
+// deploy, and the check reports stale for ever.
+//
 // Update the marker as part of deploying:
 //   npx supabase functions deploy compose
 //   git rev-parse HEAD > supabase/functions/DEPLOYED
@@ -47,7 +51,7 @@ if (!/^[0-9a-f]{40}$/.test(deployed)) {
 let changed;
 try {
   changed = execSync(
-    `git log --oneline ${deployed}..HEAD -- supabase/functions/`,
+    `git log --oneline ${deployed}..HEAD -- supabase/functions/ ":!supabase/functions/DEPLOYED"`,
     { encoding: 'utf8' }
   ).trim();
 } catch {
@@ -60,7 +64,7 @@ try {
 // Committed history is only half of it. Uncommitted edits to a function are
 // exactly the case where a "current" answer is most misleading, because that is
 // when someone is mid-change and most likely to believe the deployment matches.
-const dirty = execSync('git status --porcelain -- supabase/functions/', {
+const dirty = execSync('git status --porcelain -- supabase/functions/ ":!supabase/functions/DEPLOYED"', {
   encoding: 'utf8',
 }).trim();
 
