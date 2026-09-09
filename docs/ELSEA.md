@@ -14,9 +14,14 @@ Companions:
   composition, cost and playback.
   - [`module-library.md`](./module-library.md) — constraints the intervention
     library has to satisfy, computed from the allocator.
-  - [`tranche-nervous-ready.md`](./tranche-nervous-ready.md) and
-    [`tranche-wound-up-home.md`](./tranche-wound-up-home.md) — the content briefs
-    for the first two recipes, written for an author who does not read code.
+  - [`module-inventory-v1.md`](./module-inventory-v1.md) — the consolidated
+    47-module plan.
+  - [`audio-production-spec.md`](./audio-production-spec.md) — codec, loudness
+    and delivery requirements for recorded masters.
+  - [`tranche-nervous-ready.md`](./tranche-nervous-ready.md),
+    [`tranche-wound-up-home.md`](./tranche-wound-up-home.md) and
+    [`tranche-remaining-three.md`](./tranche-remaining-three.md) — the content
+    briefs, written for an author who does not read code.
 
 This file is the inventory and the state of play.
 
@@ -29,11 +34,12 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 221 passing across 10 suites |
+| Tests | 336 passing across 13 suites |
 | TypeScript | clean |
-| Lint | 1 pre-existing error in `src/hooks/use-color-scheme.web.ts` (Expo starter, web-only, untouched) |
-| Migrations | 8 written, **all applied** |
+| Lint | clean |
+| Migrations | 10 written, **all applied** |
 | Edge functions | `interpret` and `compose` deployed and current (`npm run deploy:check`) |
+| Deployment parity | verified — marker at `175dfbd2`, matches `main` |
 | Audio content | **none exists** |
 | Blocking | approved intervention content and audio. All 5 recipes specified. |
 
@@ -46,43 +52,21 @@ exercisable.
 
 ## 1b. Checkpoint — where the code actually is
 
-**The completion pass is not on `main`.** It sits on a pushed branch, approved
-but not integrated.
+**Everything described in this document is on `main`.** There are no other
+branches, local or remote.
 
 | | |
 |---|---|
-| Branch | `elsea-v1-completion`, pushed, tracking `origin/elsea-v1-completion` |
-| Commits ahead of `main` | 3 |
-| `main` tip | `ef68ac8` — does **not** contain the completion pass |
-| Divergence | none; `main` is an ancestor, so integration is a fast-forward |
+| Branch | `main`, pushed, matches `origin/main` |
+| Tip | `9d631db` |
+| Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
+| Deployed functions | current with `main`, verified by `npm run deploy:check` |
+| Database | all 10 migrations applied |
 
-```
-b74b5f9  Exclude the deploy marker from its own staleness check
-36173c6  Record the deployed commit for the parity check
-2d9fc85  V1 functional completion pass
-```
-
-**Read `main` and this branch differently.** Everything else in this document —
-221 tests, 8 migrations, 47-module inventory, private audio, no-repeat — is
-true of `elsea-v1-completion`. A checkout of `main` has none of it, and its
-tests, docs and function sources are three commits behind.
-
-The database and the deployed functions, however, are **already at the branch
-state**: migrations were applied and both functions deployed during the pass.
-So `main` is currently the odd one out — the repository lags the running
-system, rather than the other way round. That is the reverse of the usual
-drift and worth holding in mind: a `main` checkout will not match production.
-
-Integration, when wanted, is a fast-forward:
-
-```bash
-git checkout main
-git merge --ff-only elsea-v1-completion
-git push origin main
-```
-
-Nothing else is required — no rebase, no conflict resolution — because the
-branch was cut from the current `main` and `main` has not moved since.
+The repository, the database and the deployed functions are in agreement for
+the first time since the completion pass. An earlier version of this section
+warned that `main` lagged production; that is no longer true, and the warning
+has been removed rather than left to mislead.
 
 ## 2. Hard constraints
 
@@ -105,7 +89,8 @@ Not preferences. Breaking any is a defect, and most are enforced by tests.
     Master module recordings are the same class of IP as the recipes. Production
     manifests must resolve private assets through short-lived signed URLs. This
     will not stop a determined capture, but it prevents trivial catalogue
-    scraping. *Not yet implemented — no storage system and no audio exists.*
+    scraping. *Implemented and verified live — see §5 and §6. No audio exists
+    to put in the bucket yet.*
   - **No service-role Supabase key client-side. No provider key bundled
     client-side. No server secret in an `EXPO_PUBLIC_` variable.**
   - **Do not weaken RLS for development convenience.**
@@ -256,6 +241,9 @@ Moving the confirm step cannot quietly open a path around the gate.
 | `supabase/functions/_shared/compose.ts` | Decision to manifest. **Server-side only.** |
 | `supabase/functions/_shared/speech.ts` | TTS budget and derived cache keys. **Server-side only.** |
 | `supabase/functions/_shared/provider.ts` | Provider adapter boundary. No vendor wired. |
+| `supabase/functions/_shared/novelty.ts` | Manifest fingerprint and recency scoring. **Server-side only. Not yet called by the composer.** |
+| `supabase/functions/_shared/replay.ts` | Exact replay and reuse-intent. **Server-side only. Not yet called by the composer.** |
+| `supabase/functions/_shared/cost.ts` | Cost rows from a manifest. Dormant — nothing generates yet. |
 | `supabase/functions/compose` | **The server-side composer.** Deployed. Calls `_shared/compose.ts`; it does not assemble manifests itself. |
 | `src/lib/composition.ts` | Transport to the composer. No product logic. |
 | `src/lib/composition.ts` | Calls the composer. Transport only, no product logic. |
@@ -277,7 +265,18 @@ composer takes over **only when it returns a complete manifest**. Today it
 never does, because no modules exist, so every session falls back. It switches
 over on its own when approved content lands.
 
-### Database — 7 migrations, all applied
+### Content ingestion
+
+| File | Role |
+|---|---|
+| `scripts/modules-validate.mjs` | Validates a module manifest before anything touches the database. Rejects unknown families, malformed storage paths, duplicates, placeholder `technique_key`s and non-boolean approval. Reports a missing `ffmpeg` as SKIPPED, never as PASSED. |
+| `scripts/modules-import.mjs` | Imports validated modules. **Dry run by default** — a real write needs an explicit flag. |
+| `src/__fixtures__/modules.example.json` | The shape an author's manifest must take. Example data, clearly marked; not production content. |
+
+Nothing here invents content. The validator's job is to refuse a manifest that
+would put unapproved or placeholder material in front of a person.
+
+### Database — 10 migrations, all applied
 
 | Migration | Applied |
 |---|---|
@@ -289,6 +288,8 @@ over on its own when approved content lands.
 | `20260908150000_protect_recipes_and_seed_p19` | yes |
 | `20260908160000_drop_module_affinities` | yes |
 | `20260909100000_private_intervention_audio` | yes |
+| `20260909140000_ingestion_and_atomic_manifest` | yes |
+| `20260909160000_novelty_and_saved_sessions` | yes |
 
 Catalogue era: `transitions`, `sessions_catalogue`, `session_segments`,
 `safety_events`, `user_sessions`, `session_outcomes`.
@@ -298,6 +299,10 @@ Session engine: `intervention_modules`, `recipe_phases`,
 `session_manifests`, `manifest_segments`.
 
 Cost: `provider_pricing` (append-only, trigger-enforced), `session_costs`.
+
+Novelty and replay: `intervention_module_versions` (append-only, withdrawal
+the one permitted change), `saved_sessions` (own-row RLS), and
+`session_manifests.fingerprint`.
 
 **Private audio.** Approved masters live in the `intervention-audio` bucket,
 which is private with no client policy. Verified against the live system: anon
@@ -317,7 +322,7 @@ never receives a storage path and never touches the bucket.
 
 ### The five recipes (P19, provisional)
 
-31 phase rows and 53 family-eligibility rows, in the pending migration. Five
+31 phase rows and 53 family-eligibility rows, applied. Five
 pathways, not five scripts — the allocator fills the bottom of each band for a
 short session and distributes surplus within the ceilings as time allows.
 
@@ -331,7 +336,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 116 across 7 suites
+### Tests — 336 across 13 suites
 
 | Suite | Covers |
 |---|---|
@@ -342,6 +347,12 @@ All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 | `session-cost.test.ts` | Cost arithmetic, pricing-version integrity. |
 | `timeline.test.ts` | Playable timeline, malformed manifests, edge fades. |
 | `recipes.test.ts` | The seeded recipes, family eligibility, and that no client code queries a proprietary table. |
+| `composition-proof.test.ts` | The real allocator over all 20 recipe/duration cases. |
+| `approval-gate.test.ts` | Only approved, active modules are selectable. |
+| `manifest-persistence.test.ts` | Persistence rows against real schema constraints; rollback path. |
+| `ingestion.test.ts` | The content ingestion contract, validator and importer. |
+| `novelty-replay.test.ts` | Fingerprints, recency bounds, exact replay, withdrawal handling, cross-user isolation. |
+| `novelty-simulation.test.ts` | 30 repeated sessions per recipe; reports freshness, asserts no target. |
 
 ---
 
@@ -380,6 +391,14 @@ Probed, not assumed:
   - **The composer behaves.** `library_empty` for a valid transition with no
     modules, `bad_duration` for 99999 seconds, `unknown_transition` for an
     unknown or absent key.
+  - **Novelty and replay tables are locked.** Anon insert into `saved_sessions`
+    and `intervention_module_versions` both return `42501`, and both read `[]`.
+  - **Deployment parity holds.** After the novelty pass, `compose` was
+    redeployed and the marker recorded. The upload list carried six assets and
+    neither `novelty.ts` nor `replay.ts` among them — independent confirmation,
+    from the bundler rather than from reading imports, that the new modules are
+    not yet reachable from the composer. Live behaviour was byte-identical on
+    all three failure paths before and after, and the function booted clean.
   - **The whole flow was walked on a device**, welcome through to the outcome
     question. The session screen logged
     `[ELSEA] Session engine unavailable (library_empty)` — which is the chain
@@ -427,11 +446,12 @@ Stated plainly so none is mistaken for finished work.
 - **No audio content and no approved modules.** `intervention_modules` is
   empty. Every session runs on the catalogue fallback, silent, which the UI
   states. This is the blocker.
-- **Manifest persistence is verified in structure, not in execution.** The rows
-  it would write are checked against the real schema constraints, and the
-  rollback path is pinned, but no INSERT has run — that needs an approved
-  module with real audio, and inventing one is precisely what must not happen.
-  Watch it the first time real content lands.
+- **Manifest persistence is atomic but still unexercised.** It now writes
+  through a `security definer` RPC so a manifest and its segments land
+  together or not at all. The rows are checked against the real schema
+  constraints and the rollback path is pinned, but **no INSERT has ever
+  run** — that needs an approved module with real audio, and inventing one
+  is precisely what must not happen. Watch it the first time content lands.
 - **Nothing writes `session_costs`.** The manifest link and every column exist;
   the row does not, because there is no generation to cost. Needs a TTS
   provider.
@@ -444,6 +464,19 @@ Stated plainly so none is mistaken for finished work.
   `supabase/functions/deno-ambient.d.ts`. It does NOT verify calls against the
   real supabase-js signatures, because there is no `deno` here and tsc cannot
   resolve a `jsr:` specifier. Do not read a clean run as full Deno type safety.
+- **Novelty is deployed but dormant.** `_shared/novelty.ts` and
+  `_shared/replay.ts` are written, tested and on the server, but the composer
+  does not call them: nothing reads a person's recent fingerprints yet, and no
+  session is currently made fresher by any of it. Wiring it in is blocked on
+  two product decisions — the recency window, and how novelty should weigh
+  against measured effectiveness — recorded in `session-engine.md`.
+- **`wired_sleep` has a content variety problem, not a code problem.** Over 30
+  simulated repeat sessions it produced 7 distinct compositions, and
+  `sleep_10s` appeared in **all 30**, because it is the only module short
+  enough for that recipe's 11-second `close`. No novelty weighting can vary a
+  slot with one candidate. Flagged as **CONTENT INVENTORY EXPANSION DECISION
+  REQUIRED**; modules were deliberately not invented to improve the number.
+  For comparison: `nervous_ready` produced 30 distinct compositions from 30.
 - **Edge fades, not crossfades.** A true crossfade overlaps cues and would make
   playback finish before the composed duration. Deferred to the design pass.
 - **`FADE_SECONDS`, `BED_GAIN`, `BED_GAIN_DUCKED` are engineering defaults**,
@@ -463,15 +496,28 @@ Engineering has taken this as far as it legitimately can without content.
    target is documented anywhere.
 4. Whether 20–30% silence in a five-minute session is acceptable. If not, the
    answer is more short modules.
+5. Whether `wired_sleep` gets more short `close` modules, or whether one
+   repeated closing module is acceptable there.
+
+**From product — blocking the novelty wiring:**
+
+1. How many sessions, or how long, counts as "recent".
+2. How novelty should weigh against measured effectiveness. The current
+   defaults are placeholders chosen so the mechanism could be simulated; they
+   are not findings, and `novelty-simulation.test.ts` exists so the call can be
+   made from evidence.
+3. Whether the freshness in §7 is acceptable for someone using this daily.
 
 **From design:** the screen pass. Two questions from the device walk are still
 open — a state pill routes to the correction screen rather than into a session,
 and someone arriving `tired_wired` sees one enabled target card and five
 dimmed.
 
-**From engineering, once content exists:** upload masters to the private
-bucket, set `approved`, watch manifest persistence execute for the first time,
-then the dynamic speech layer when a provider is chosen.
+**From engineering, once content exists:** validate and import the manifest,
+upload masters to the private bucket, set `approved`, watch manifest
+persistence execute for the first time, wire novelty into the composer once
+the weightings above are decided, then the dynamic speech layer when a
+provider is chosen.
 
 ## 9. Working on it
 
@@ -484,6 +530,8 @@ npx expo start                          # dev server
 npx supabase migration list             # what is applied
 npx supabase db push                    # apply pending migrations
 npx supabase functions deploy compose   # deploy the composer
+node scripts/modules-validate.mjs FILE  # check a content manifest
+node scripts/modules-import.mjs FILE    # dry run; needs a flag to write
 ```
 
 Notes for whoever picks this up:
