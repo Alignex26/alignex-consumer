@@ -1,0 +1,13 @@
+[
+  {
+    "module_key": "example_not_real_content",
+    "family": "orient",
+    "technique_key": "CONTENT_AUTHORING_REQUIRED",
+    "storage_path": "modules/orient/example_not_real_content.m4a",
+    "duration_seconds": 20,
+    "intensity": 5,
+    "requires_headphones": false,
+    "is_bed": false,
+    "approved": false
+  }
+]

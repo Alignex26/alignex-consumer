@@ -167,44 +167,38 @@ async function persistManifest(
   if (!userId) return null;
 
   try {
-    const { data, error } = await admin
-      .from("session_manifests")
-      .insert({
-        user_id: userId,
-        transition_key: manifest.transitionKey,
-        duration_seconds: manifest.durationSeconds,
-        recipe_version: manifest.recipeVersion,
-        dynamic_seconds: manifest.dynamicSeconds,
-      })
-      .select("id")
-      .single();
+    // One transaction, server-side. The manifest and its segments commit
+    // together or not at all.
+    //
+    // This replaced two separate inserts with a hand-written compensating
+    // delete when the second failed — but that delete is itself a write that
+    // can fail, so a dropped connection between the two left an orphan
+    // manifest with no segments. Postgres does the rollback properly.
+    const { data, error } = await admin.rpc("persist_session_manifest", {
+      p_user_id: userId,
+      p_transition_key: manifest.transitionKey,
+      p_duration_seconds: manifest.durationSeconds,
+      p_recipe_version: manifest.recipeVersion,
+      p_dynamic_seconds: manifest.dynamicSeconds,
+      p_segments: manifest.segments.map((segment) => ({
+        ordinal: segment.ordinal,
+        kind: segment.kind,
+        module_id: segment.kind === "module" ? segment.moduleId : null,
+        // Generated speech needs its `generated_segments` row first. Nothing
+        // produces speech yet; the table's check constraint rejects a
+        // generated segment without one, and the whole transaction rolls back.
+        generated_id: null,
+        layer: segment.layer,
+        offset_seconds: segment.offsetSeconds,
+        duration_seconds: segment.durationSeconds,
+      })),
+    });
 
     if (error || !data) return null;
-    const manifestId = data.id as string;
-
-    const rows = manifest.segments.map((segment) => ({
-      manifest_id: manifestId,
-      ordinal: segment.ordinal,
-      kind: segment.kind,
-      module_id: segment.kind === "module" ? segment.moduleId : null,
-      // Generated speech needs its `generated_segments` row first. Nothing
-      // produces speech yet; if it ever arrives without one, the table's own
-      // check constraint rejects the write and this rolls back rather than
-      // storing a segment that points at nothing.
-      generated_id: null,
-      layer: segment.layer,
-      offset_seconds: segment.offsetSeconds,
-      duration_seconds: segment.durationSeconds,
-    }));
-
-    const { error: segmentError } = await admin.from("manifest_segments").insert(rows);
-    if (segmentError) {
-      await admin.from("session_manifests").delete().eq("id", manifestId);
-      return null;
-    }
-
-    return manifestId;
+    return data as string;
   } catch {
+    // Bookkeeping must never cost somebody their session. The gap stays
+    // visible in the data as a run with no manifest rather than hidden.
     return null;
   }
 }

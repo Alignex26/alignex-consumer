@@ -59,6 +59,7 @@ declare module 'jsr:@supabase/supabase-js@2' {
 
   export interface SupabaseClient {
     from(table: string): Table;
+    rpc(fn: string, args?: Record<string, unknown>): PostgrestResult<unknown>;
     storage: { from(bucket: string): Bucket };
     auth: {
       getUser(token: string): Promise<{

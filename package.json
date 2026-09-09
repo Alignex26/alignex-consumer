@@ -53,7 +53,9 @@
     "typecheck": "tsc --noEmit",
     "typecheck:functions": "tsc --noEmit -p tsconfig.functions.json",
     "verify": "npm run typecheck && npm run typecheck:functions && npm run lint && npm test",
-    "deploy:check": "node scripts/deploy-check.mjs"
+    "deploy:check": "node scripts/deploy-check.mjs",
+    "modules:validate": "node scripts/modules-validate.mjs",
+    "modules:import": "node scripts/modules-import.mjs"
   },
   "private": true,
   "jest": {

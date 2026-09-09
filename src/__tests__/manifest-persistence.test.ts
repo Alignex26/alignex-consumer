@@ -105,14 +105,18 @@ describe('the persistence path itself', () => {
     expect(helper).toContain('if (!userId) return null;');
   });
 
-  it('rolls the manifest back if its segments fail', () => {
-    // A manifest with no segments is not a smaller record, it is a false one.
+  it('persists the manifest and its segments in one transaction', () => {
+    // Previously two inserts with a hand-written delete if the second failed.
+    // That compensating delete is itself a write that can fail, so a dropped
+    // connection between them left an orphan manifest with no segments —
+    // which `user_sessions.manifest_id` may already point at. Postgres does
+    // the rollback properly now.
     const helper = COMPOSER.slice(
       COMPOSER.indexOf('async function persistManifest'),
       COMPOSER.indexOf('Deno.serve')
     );
-    expect(helper).toContain('if (segmentError) {');
-    expect(helper).toContain('.from("session_manifests").delete().eq("id", manifestId)');
+    expect(helper).toContain('admin.rpc("persist_session_manifest"');
+    expect(helper).not.toContain('.delete()');
   });
 
   it('never lets a failed write break the session', () => {

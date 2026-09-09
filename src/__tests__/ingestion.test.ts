@@ -1,0 +1,251 @@
+/// <reference types="node" />
+
+import { execFileSync } from 'child_process';
+import { mkdtempSync, writeFileSync, readFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
+import { costRowFor, segmentMix, type RateCard } from '../../supabase/functions/_shared/cost';
+
+import { composeFor, DURATIONS, RECIPES } from './composition-proof.test';
+
+/**
+ * CONTENT INGESTION, COST TELEMETRY, AND THE SILENCE REPORT.
+ *
+ * The validator is exercised as a real subprocess rather than by importing its
+ * internals, because the thing that must work is the command a person will
+ * actually run before an import.
+ */
+
+const VALIDATOR = join(__dirname, '..', '..', 'scripts', 'modules-validate.mjs');
+
+/** A structurally valid record. Not content: `technique_key` is a stand-in. */
+const valid = (over: Record<string, unknown> = {}) => ({
+  module_key: 'probe_module',
+  family: 'orient',
+  technique_key: 'PENDING_CLINICAL',
+  storage_path: 'modules/orient/probe_module.m4a',
+  duration_seconds: 20,
+  intensity: 5,
+  requires_headphones: false,
+  is_bed: false,
+  approved: false,
+  ...over,
+});
+
+function validate(records: unknown[]): { code: number; output: string } {
+  const dir = mkdtempSync(join(tmpdir(), 'elsea-'));
+  const file = join(dir, 'manifest.json');
+  writeFileSync(file, JSON.stringify(records));
+  try {
+    const output = execFileSync(process.execPath, [VALIDATOR, file], { encoding: 'utf8' });
+    return { code: 0, output };
+  } catch (error) {
+    const e = error as { status: number; stdout?: string; stderr?: string };
+    return { code: e.status, output: `${e.stdout ?? ''}${e.stderr ?? ''}` };
+  }
+}
+
+describe('the module validator', () => {
+  it('passes a structurally sound record', () => {
+    expect(validate([valid()]).code).toBe(0);
+  });
+
+  it('rejects an unknown family', () => {
+    const r = validate([valid({ family: 'breathing' })]);
+    expect(r.code).toBe(1);
+    expect(r.output).toContain('not one of the twelve approved families');
+  });
+
+  it('rejects a storage path outside the private bucket layout', () => {
+    for (const path of [
+      'https://example.com/audio.m4a',
+      '/modules/orient/x.m4a',
+      'modules/../secrets.m4a',
+      'public/orient/x.m4a',
+    ]) {
+      const r = validate([valid({ storage_path: path })]);
+      expect(r.code).toBe(1);
+      expect(r.output).toContain('storage_path');
+    }
+  });
+
+  it('rejects a path filed under the wrong family', () => {
+    const r = validate([valid({ family: 'close', storage_path: 'modules/orient/probe_module.m4a' })]);
+    expect(r.code).toBe(1);
+  });
+
+  it('rejects a duplicate module key', () => {
+    const r = validate([valid(), valid()]);
+    expect(r.code).toBe(1);
+    expect(r.output).toContain('duplicate module_key');
+  });
+
+  it('rejects the placeholder technique_key', () => {
+    // The marker used throughout the specs for content that does not exist.
+    // It must never reach the database looking like an authored technique.
+    const r = validate([valid({ technique_key: 'CONTENT_AUTHORING_REQUIRED' })]);
+    expect(r.code).toBe(1);
+    expect(r.output).toContain('content has not been authored');
+  });
+
+  it('rejects a missing or non-boolean approval', () => {
+    expect(validate([valid({ approved: undefined })]).code).toBe(1);
+    expect(validate([valid({ approved: 'yes' })]).code).toBe(1);
+  });
+
+  it('rejects an approved module with no audio when audio is being checked', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'elsea-'));
+    const file = join(dir, 'm.json');
+    writeFileSync(file, JSON.stringify([valid({ approved: true })]));
+    let code = 0;
+    try {
+      execFileSync(process.execPath, [VALIDATOR, file, '--audio-dir', dir], { encoding: 'utf8' });
+    } catch (error) {
+      code = (error as { status: number }).status;
+    }
+    expect(code).toBe(1);
+  });
+
+  it('reports missing media tools as skipped, never as passed', () => {
+    // A check that could not run must not read as a check that succeeded.
+    const r = validate([valid()]);
+    if (r.output.includes('SKIPPED')) {
+      expect(r.output).toContain('not passed');
+    }
+  });
+});
+
+describe('the importer refuses to act without being told to', () => {
+  const IMPORTER = readFileSync(join(__dirname, '..', '..', 'scripts', 'modules-import.mjs'), 'utf8');
+
+  it('is dry-run unless --commit is given', () => {
+    expect(IMPORTER).toContain("const commit = args.includes('--commit');");
+    expect(IMPORTER).toContain('Dry run. Nothing written, nothing uploaded.');
+  });
+
+  it('validates before it writes anything', () => {
+    expect(IMPORTER.indexOf('modules-validate.mjs')).toBeLessThan(IMPORTER.indexOf('--- credentials'));
+  });
+
+  it('never infers approval', () => {
+    // Approval is the clinical gate. It is copied from the input and never
+    // defaulted, upgraded or assumed.
+    expect(IMPORTER).toContain('approved: m.approved === true');
+    expect(IMPORTER).not.toContain('approved: true,');
+  });
+
+  it('uploads to the private bucket only', () => {
+    expect(IMPORTER).toContain("const BUCKET = 'intervention-audio';");
+    expect(IMPORTER).not.toContain('/public/');
+  });
+
+  it('takes the service key from the environment, never from a file', () => {
+    expect(IMPORTER).toContain('process.env.SUPABASE_SERVICE_ROLE_KEY');
+    expect(IMPORTER).toContain('do not add it to .env');
+  });
+});
+
+describe('cost telemetry is ready but dormant', () => {
+  const card: RateCard = {
+    pricingVersion: '2026-01-01.test',
+    currency: 'USD',
+    ratesPerMillion: {
+      llm_input_token: 1,
+      llm_output_token: 10,
+      tts_character: 100,
+      delivery_byte: 0.0001,
+    },
+  };
+
+  const composed = composeFor('nervous_ready', 600);
+  if (!composed.ok) throw new Error('fixture failed');
+  const { manifest } = composed;
+
+  it('derives the segment mix from the manifest, not from a caller', () => {
+    // The reuse ratio is the economic thesis. A hand-supplied number would be
+    // the first thing to drift from what was actually composed.
+    const mix = segmentMix(manifest);
+    expect(mix.library).toBe(manifest.segments.filter((s) => s.kind === 'module').length);
+    expect(mix.generated).toBe(0);
+  });
+
+  it('costs a session with no generation at nothing but delivery', () => {
+    const row = costRowFor('m-1', 'u-1', manifest, {
+      llm: null, tts: null, deliveryBytes: 5_000_000, cachedSegments: 0,
+    }, card);
+
+    expect(row.tts_cost_micros).toBe(0);
+    expect(row.llm_cost_micros).toBe(0);
+    expect(row.total_variable_cost_micros).toBe(500);
+  });
+
+  it('prices real usage when it eventually exists', () => {
+    const row = costRowFor('m-1', 'u-1', manifest, {
+      llm: { provider: 'p', model: 'm', inputTokens: 400, outputTokens: 60 },
+      tts: { provider: 'p', model: 'v', characters: 400, seconds: 30 },
+      deliveryBytes: 5_000_000,
+      cachedSegments: 0,
+    }, card);
+
+    expect(row.llm_cost_micros).toBe(1000);
+    expect(row.tts_cost_micros).toBe(40_000);
+    expect(row.total_variable_cost_micros).toBe(41_500);
+    expect(row.pricing_version).toBe('2026-01-01.test');
+  });
+
+  it('keeps every figure an integer', () => {
+    const row = costRowFor('m-1', null, manifest, {
+      llm: null, tts: null, deliveryBytes: 1234, cachedSegments: 0,
+    }, card);
+    for (const key of ['llm_cost_micros', 'tts_cost_micros', 'delivery_cost_micros', 'total_variable_cost_micros']) {
+      expect(Number.isInteger(row[key] as number)).toBe(true);
+    }
+  });
+
+  it('refuses to price against a broken rate card', () => {
+    const broken = { ...card, ratesPerMillion: { ...card.ratesPerMillion, tts_character: Number.NaN } };
+    expect(() =>
+      costRowFor('m-1', 'u-1', manifest, { llm: null, tts: null, deliveryBytes: 0, cachedSegments: 0 }, broken)
+    ).toThrow(/cannot price/);
+  });
+
+  it('is not called from the production composer', () => {
+    // Dormant on purpose: with nothing generated the row would be all zeros,
+    // and a table of zero-cost rows looks like telemetry while saying nothing.
+    const composer = readFileSync(
+      join(__dirname, '..', '..', 'supabase', 'functions', 'compose', 'index.ts'), 'utf8'
+    );
+    expect(composer).not.toContain('costRowFor');
+  });
+});
+
+describe('silence report — SILENCE ACCEPTANCE DECISION REQUIRED', () => {
+  it('reports silence for every recipe and duration', () => {
+    const rows: string[] = ['  recipe               dur   total  module  silence   %'];
+    for (const recipe of RECIPES) {
+      for (const seconds of DURATIONS) {
+        const result = composeFor(recipe, seconds);
+        expect(result.ok).toBe(true);
+        if (!result.ok) throw new Error('unreachable');
+
+        const total = result.manifest.durationSeconds;
+        const silence = result.manifest.segments
+          .filter((s) => s.kind === 'silence')
+          .reduce((n, s) => n + s.durationSeconds, 0);
+        const spoken = total - silence;
+
+        rows.push(
+          `  ${recipe.padEnd(20)} ${String(seconds).padStart(4)} ${String(total).padStart(6)} ` +
+          `${String(spoken).padStart(7)} ${String(silence).padStart(8)} ${String(Math.round(silence / total * 100)).padStart(3)}%`
+        );
+
+        // No target is asserted. There is no approved threshold, and inventing
+        // one here would turn a product decision into a test.
+        expect(silence).toBeGreaterThanOrEqual(0);
+        expect(spoken).toBeGreaterThan(0);
+      }
+    }
+    console.log('\n' + rows.join('\n') + '\n');
+  });
+});
