@@ -543,12 +543,13 @@ rejected before it can be imported.
 **Name each delivered file `<module_key>.m4a`** — for example
 `nr_arrive_short.m4a`. Lower-case letters, digits and underscores only.
 
-> **Documentation conflict, flagged rather than resolved.**
-> `docs/audio-production-spec.md` lists a naming pattern of
-> `<family>_<key>_<seconds>s.m4a`. The tooling does not use that: it looks for a
-> file named exactly after the module key. The tooling is what runs, so follow
-> `<module_key>.m4a`. Engineering should reconcile the spec — it is a
-> documentation defect, not an authoring question.
+Both the validator and the importer find a module's audio by that name. A file
+named anything else is not found, and an approved module with no audio stops
+the import before anything is written — so the name is not a convention, it is
+a requirement.
+
+`docs/audio-production-spec.md` §5 says the same thing. (It previously gave a
+different pattern; that was a documentation error and has been corrected.)
 
 ### Silence and fades
 

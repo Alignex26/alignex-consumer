@@ -23,7 +23,7 @@ conform.
 | Leading silence | ≤ 100 ms |
 | Trailing silence | ≤ 100 ms |
 | Fades | none baked in |
-| Naming | `<family>_<key>_<seconds>s.m4a` |
+| Naming | `<module_key>.m4a` — see §5 |
 | Typical size | ~12 KB per second (~1.2 MB for 100 s) |
 
 ## 2. Why each of these
@@ -111,7 +111,29 @@ and the object names carry no recipe or selection information — knowing a file
 is `modules/regulate/x.m4a` reveals the taxonomy, which is already public in
 the app's behaviour, and nothing about which recipes use it or when.
 
-## 5. Not specified here
+## 5. File naming
+
+**A delivered master is named `<module_key>.m4a`** — for example
+`nr_arrive_short.m4a`. Lower case letters, digits and underscores only, and the
+name must match the module's `module_key` exactly.
+
+That is not a convention; it is what the tooling requires. Both the validator
+and the importer locate a module's audio by taking the **basename of its
+`storage_path`** and looking for that file in the delivery folder. Since the
+storage path is `modules/<family>/<module_key>.m4a`, the file has to be
+`<module_key>.m4a` or it is simply not found — and an approved module with no
+file stops the import before anything is written.
+
+> **Corrected 2026-09-09.** This table previously specified
+> `<family>_<key>_<seconds>s.m4a`, which nothing implemented and which no
+> delivery could have satisfied: a file named that way would fail the audio
+> check for every approved module in a tranche. The family is already carried
+> by the storage path, and the duration is already carried by
+> `duration_seconds` and verified against the file itself, so encoding either
+> into the filename would have duplicated a fact that is checked elsewhere —
+> and a duration in a filename is a fact that can silently go stale.
+
+## 6. Not specified here
 
 - **Voice, delivery, pacing and tone.** Content decisions.
 - **Whether a module needs headphones.** Per-module content decision; the

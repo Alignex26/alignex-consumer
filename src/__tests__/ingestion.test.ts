@@ -249,3 +249,43 @@ describe('silence report — SILENCE ACCEPTANCE DECISION REQUIRED', () => {
     console.log('\n' + rows.join('\n') + '\n');
   });
 });
+
+describe('the audio spec agrees with the tooling', () => {
+  /**
+   * The spec is what a voice producer works from; the validator is what
+   * actually runs. When they disagree, the producer follows the document and
+   * every delivered file fails — or worse, an approved module arrives with no
+   * findable audio and the import stops halfway through a tranche.
+   *
+   * This happened: the spec specified `<family>_<key>_<seconds>s.m4a` while the
+   * tooling looked for `<module_key>.m4a`. Nothing caught it, because nothing
+   * compared the two.
+   */
+  const SPEC = readFileSync(join(__dirname, '..', '..', 'docs', 'audio-production-spec.md'), 'utf8');
+  const VALIDATOR_SOURCE = readFileSync(VALIDATOR, 'utf8');
+
+  it('names delivered files the way the tooling looks for them', () => {
+    // The tooling resolves audio as basename(storage_path), and storage_path is
+    // modules/<family>/<module_key>.m4a — so the file is <module_key>.m4a.
+    expect(VALIDATOR_SOURCE).toContain('basename(m.storage_path');
+    expect(SPEC).toContain('`<module_key>.m4a`');
+  });
+
+  it('no longer specifies the pattern that nothing implemented', () => {
+    // The old pattern may still appear in the correction note explaining why it
+    // was wrong — that is history, not a specification. What must not survive
+    // is the naming ROW still asserting it.
+    const namingRow = SPEC.split('\n').find((line) => line.startsWith('| Naming |'));
+    expect(namingRow).toBeDefined();
+    expect(namingRow).toContain('<module_key>.m4a');
+    expect(namingRow).not.toContain('<seconds>s');
+  });
+
+  it('states the same storage path the validator enforces', () => {
+    // Built without a literal backslash so the assertion cannot drift from the
+    // source through escaping alone.
+    const pattern = ['^modules', '[a-z]+', '[a-z0-9_]+'].join('\\/');
+    expect(VALIDATOR_SOURCE).toContain(pattern);
+    expect(SPEC).toContain('modules/<family>/<module_key>.m4a');
+  });
+});
