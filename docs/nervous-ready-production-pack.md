@@ -40,37 +40,48 @@ be followed rather than merely heard.
 | Module | Ceiling | Words | Breath cycles | Est. @130 | Est. @110 | Verdict |
 |---|---:|---:|---:|---:|---:|---|
 | `nr_arrive_short` | 21s | 34 | — | 15.7s | 18.5s | **fits** |
-| `nr_regulate_short` | 45s | 70 | 3 | **56.3s** | **62.2s** | **OVER** |
+| `nr_regulate_short` | 45s | 67 | 2 | **46.9s** | **52.5s** | **STILL OVER** |
 | `nr_reframe_short` | 40s | 64 | — | 29.5s | 34.9s | **fits** |
 | `nr_prepare_short` | 45s | 72 | — | 33.2s | 39.3s | **fits** |
 | `nr_close_short` | 11s | 18 | — | 8.3s | 9.8s | fits, **tight** |
 
-### `nr_regulate_short` cannot be delivered in 45 seconds as written
+### `nr_regulate_short` is still over 45 seconds after the cut
 
-The script asks for three extended-exhale cycles — *"Breathe in gently, then
-let the out-breath be a little longer. Again. In, easy. Out, slower… One more
-time."* Those cycles are the technique, and they need roughly 8 seconds each of
-actual time. Seventy words of speech plus ~24 seconds of breathing comes to
-**56–62 seconds against a 45-second ceiling**.
+**Cutting the third breath cycle helped substantially and was not enough.**
 
-This is not fixable in the edit, and it must not be fixed by speaking faster: a
-hurried extended-exhale prompt is not an extended exhale.
+| | Words | Cycles | Est. @130wpm | Est. @110wpm |
+|---|---:|---:|---:|---:|
+| As first drafted | 70 | 3 | 56.3s | 62.2s |
+| **After the cut** | 67 | 2 | **46.9s** | **52.5s** |
+| Ceiling | | | **45s** | **45s** |
 
-**A content decision is required.** Engineering will not rewrite the script.
-The options the architecture already supports:
+The remaining gap is **~2 seconds at 130 wpm and ~7.5 at 110 wpm**. Two
+extended-exhale cycles are 16 seconds of the 45 on their own, and the words
+around them are 67.
 
-- **Fewer breath cycles.** Two cycles rather than three brings it to roughly
-  48–54s — still over. One cycle brings it to ~40–46s, at the ceiling.
-- **Fewer words around the breathing.** Removing the closing two sentences
-  (~30 words) saves 14–16s.
-- **Author it as the longer module instead.** `nr_regulate_long` has a 254s
-  ceiling and this technique fits it comfortably — but then the five-minute
-  session still needs a short `regulate` or `ground` module, because
-  `regulate_arousal` cannot be filled without one.
+It cannot be closed by speaking faster: a hurried extended-exhale prompt is not
+an extended exhale, and the technique is the breathing rather than the
+sentences.
 
-Recording it at 56s and hoping is the one option that does not work: the
+**A further content decision is required.** Engineering will not rewrite the
+script. What the architecture supports, smallest first:
+
+- **Cut the closing two sentences** (*"You're not trying to become perfectly
+  calm. You're just taking the edge off, enough to give yourself more room for
+  what comes next."* — 30 words). That saves 14–16 seconds and brings it to
+  **31–37s**, comfortably inside 45 with room for the breathing to breathe.
+  This is the smallest change that actually works.
+- **Cut to one breath cycle**, leaving 8 seconds of breathing. Roughly
+  39–45s — at the ceiling, with no headroom, and one cycle may not be enough
+  of the technique to be worth doing.
+- **Author it as `nr_regulate_long` instead** (254s ceiling, fits comfortably).
+  But `regulate_arousal` still needs a short module for the five-minute
+  session, so a different short `regulate` or `ground` module would then be
+  required.
+
+Recording it at 47s and hoping is the one option that does not work: the
 validator rejects a file more than 0.25s from its declared length, and a
-45-second slot silently will not select a 56-second module.
+45-second slot silently will not select a 47-second module.
 
 ### `nr_close_short` is tight but viable
 
@@ -120,7 +131,7 @@ meditative.
 | Author status | DRAFT COMPLETE |
 | Content approval | PENDING |
 | Clinical approval | PENDING |
-| Recording | NOT RECORDED — **blocked, see the duration finding above** |
+| Recording | NOT RECORDED — **still blocked on duration after the cut; see above** |
 | Audio validation | NOT RUN |
 | Final filename | `nr_regulate_short.m4a` |
 | `approved` | **false** |
@@ -132,9 +143,12 @@ meditative.
 > Breathe in gently, then let the out-breath be a little longer.
 > Again. In, easy. Out, slower.
 > Let your shoulders soften as you breathe out.
-> One more time.
 > You're not trying to become perfectly calm.
 > You're just taking the edge off, enough to give yourself more room for what comes next.
+
+**Revised 2026-09-09** — the third breath cycle (*"One more time."*) was cut on
+instruction. Two cycles remain. This shortened the module by roughly nine
+seconds and **did not bring it inside the ceiling**; see the duration finding.
 
 **Delivery direction** — Grounded and normal. Allow enough space for the
 breathing prompts without exceeding 45 seconds.
@@ -301,8 +315,10 @@ The library remains empty and `compose` still answers `library_empty`.
 
 ## What has to happen next, in order
 
-1. **Content decision on `nr_regulate_short`** — it cannot be delivered in 45
-   seconds as written.
+1. **A further content decision on `nr_regulate_short`.** The third breath
+   cycle was cut on 2026-09-09, which brought it from 56–62s to 47–53s — still
+   over the 45-second ceiling. Cutting the closing two sentences is the
+   smallest change that would resolve it.
 2. **Content review** of all five scripts.
 3. **Clinical review**, including confirmation or replacement of the five
    proposed `technique_key` values and a decision on `intensity`.
