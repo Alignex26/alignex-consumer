@@ -752,8 +752,8 @@ the validator and importer expect.
 |---|---|
 | Modules | 5 |
 | Author status | DRAFT COMPLETE |
-| Content approval | **GRANTED** — product owner, 2026-09-09 |
-| Clinical approval | **PENDING** |
+| Product + content approval | **APPROVED** — product owner / content owner, 2026-09-09, as general wellbeing content |
+| Clinical review | **NOT CLAIMED / NOT RECORDED** |
 | `technique_key` | **proposed**, five of five — none clinically confirmed |
 | Recording | **NOT RECORDED** |
 | `approved` | **false**, five of five — the flag gates playback, not review; it flips at import once audio exists |

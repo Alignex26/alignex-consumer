@@ -6,19 +6,72 @@ clinical review.
 Prepared: 2026-09-09. Draft manifest:
 [`content/nervous-ready-tranche-1.draft.json`](../content/nervous-ready-tranche-1.draft.json)
 
-> **CONTENT APPROVED 2026-09-09. CLINICAL REVIEW STILL OUTSTANDING.**
+> **PRODUCT AND CONTENT APPROVED 2026-09-09. CLINICAL REVIEW NOT CLAIMED.**
 >
-> The five scripts below were approved by the product owner on 2026-09-09.
-> That is the content decision, and it is recorded as given.
->
-> **Clinical sign-off has not been recorded**, and the five `technique_key`
-> values remain **proposed** — naming a technique is the clinical call, not a
-> content one. No audio has been recorded, nothing has been imported, and no
-> service-role key has been used.
->
-> `approved` remains **false** in the manifest. That flag is not the content
-> decision: it is what makes a module *playable to a person*, and it cannot be
-> true before the audio exists — see "Why the manifest flag is still false".
+> See "Approval record" below for exactly what was approved, by whom, and in
+> what capacity. No audio has been recorded, nothing has been imported, and no
+> service-role key has been used. `approved` remains **false** in the manifest.
+
+---
+
+---
+
+## Approval record
+
+### Who approved, and in what capacity
+
+**Role: PRODUCT OWNER / CONTENT OWNER**, with prior relevant wellbeing and
+mindfulness training. Recorded 2026-09-09.
+
+**Approved:**
+
+- the product intent
+- the wording
+- the tone
+- the delivery direction
+- the use of these five modules within ELSEA as **general wellbeing content**
+
+**Expressly not claimed:**
+
+- to be a clinical psychologist
+- to be a medical professional
+- to hold current regulated clinical authority
+- to provide diagnosis or treatment
+
+### Status
+
+| Gate | Status |
+|---|---|
+| Product approval | **APPROVED** — product owner, 2026-09-09 |
+| Content wording | **APPROVED** — product owner, 2026-09-09 |
+| Wellbeing content review | **APPROVED BY PRODUCT OWNER** |
+| Clinical review | **NOT CLAIMED / NOT RECORDED** |
+| `technique_key` values | **PROPOSED** — five of five, none clinically confirmed |
+| `approved` import flag | **false** — until the existing governance requirement is legitimately satisfied |
+
+This distinction is deliberate and is recorded so it is auditable later. A
+product owner with wellbeing training approving wording as general wellbeing
+content is a real and sufficient decision for what it covers. It is not a
+clinical sign-off, and this document does not present it as one.
+
+### What the `approved` flag would mean if set
+
+It is the selection gate in the deployed composer:
+
+```
+.eq("is_active", true)
+.eq("approved", true)
+```
+
+Setting it true says *this may be played to a person now*. It stays false here
+for two independent reasons, either of which is sufficient:
+
+1. **No audio exists.** The storage paths point at objects that are not in the
+   bucket, so all five would be selected, fail to sign, and return
+   `audio_unavailable` — failing the whole composition rather than the current
+   clean `library_empty`. The validator enforces the same rule from the other
+   side: an approved module with no audio file is a hard failure.
+2. **The governance requirement recorded as S4 has not been satisfied.**
 
 ---
 
@@ -28,8 +81,8 @@ Prepared: 2026-09-09. Draft manifest:
 |---|---|
 | Modules | 5 |
 | Author status | **DRAFT COMPLETE** |
-| Content approval | **GRANTED** — product owner, 2026-09-09 |
-| Clinical approval | **PENDING** |
+| Product + content approval | **APPROVED** — product owner / content owner, 2026-09-09 |
+| Clinical review | **NOT CLAIMED / NOT RECORDED** |
 | `technique_key` | **proposed** — five of five, none confirmed |
 | Recording status | **NOT RECORDED** |
 | Audio validation | **NOT RUN** |
@@ -130,8 +183,8 @@ no clinician has named these.
 | Maximum duration | **21 seconds** |
 | Proposed `technique_key` | `present_moment_orienting` |
 | Author status | DRAFT COMPLETE |
-| Content approval | **GRANTED** 2026-09-09 |
-| Clinical approval | PENDING |
+| Product / content approval | **APPROVED** 2026-09-09 (product owner) |
+| Clinical review | NOT CLAIMED |
 | Recording | NOT RECORDED |
 | Audio validation | NOT RUN |
 | Final filename | `nr_arrive_short.m4a` |
@@ -157,8 +210,8 @@ meditative.
 | Maximum duration | **45 seconds** |
 | Proposed `technique_key` | `extended_exhale_release` |
 | Author status | DRAFT COMPLETE |
-| Content approval | **GRANTED** 2026-09-09 |
-| Clinical approval | PENDING |
+| Product / content approval | **APPROVED** 2026-09-09 (product owner) |
+| Clinical review | NOT CLAIMED |
 | Recording | NOT RECORDED |
 | Audio validation | NOT RUN |
 | Final filename | `nr_regulate_short.m4a` |
@@ -197,8 +250,8 @@ breathing prompts without exceeding 45 seconds.
 | Maximum duration | **40 seconds** |
 | Proposed `technique_key` | `nervous_energy_reappraisal` |
 | Author status | DRAFT COMPLETE |
-| Content approval | **GRANTED** 2026-09-09 |
-| Clinical approval | PENDING |
+| Product / content approval | **APPROVED** 2026-09-09 (product owner) |
+| Clinical review | NOT CLAIMED |
 | Recording | NOT RECORDED |
 | Audio validation | NOT RUN |
 | Final filename | `nr_reframe_short.m4a` |
@@ -229,8 +282,8 @@ reassurance or therapy.
 | Maximum duration | **45 seconds** |
 | Proposed `technique_key` | `first_action_rehearsal` |
 | Author status | DRAFT COMPLETE |
-| Content approval | **GRANTED** 2026-09-09 |
-| Clinical approval | PENDING |
+| Product / content approval | **APPROVED** 2026-09-09 (product owner) |
+| Clinical review | NOT CLAIMED |
 | Recording | NOT RECORDED |
 | Audio validation | NOT RUN |
 | Final filename | `nr_prepare_short.m4a` |
@@ -265,8 +318,8 @@ Still controlled and grounded.
 | Maximum duration | **11 seconds** |
 | Proposed `technique_key` | `readiness_transition_cue` |
 | Author status | DRAFT COMPLETE |
-| Content approval | **GRANTED** 2026-09-09 |
-| Clinical approval | PENDING |
+| Product / content approval | **APPROVED** 2026-09-09 (product owner) |
+| Clinical review | NOT CLAIMED |
 | Recording | NOT RECORDED |
 | Audio validation | NOT RUN |
 | Final filename | `nr_close_short.m4a` |
