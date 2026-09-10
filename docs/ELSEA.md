@@ -67,7 +67,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `6096fc8` |
+| Tip | `d18f033` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 15 migrations applied |
@@ -1144,7 +1144,7 @@ natural first step and would fail immediately.
 | # | Step | Blocked on | Fails with if skipped |
 |---:|---|---|---|
 | 1 | ~~Load the scripts into `script_text`~~ **done** | — | — |
-| 2 | Import the five modules and their `en` version rows | a service-role key | `unknown_module` |
+| 2 | ~~Import the five modules + `en` versions~~ **reported done, unverified** — see §6k | — | — |
 
 **Step 2 is READY TO COMMIT.** Integrity checked programmatically on
 2026-09-10 — all five `script_text` values match the approved pack exactly, by
@@ -1185,6 +1185,46 @@ database looking approved.
 unit-proven, and blocked on one thing: **no provider voice mappings exist**, so
 every generation would fail `no_provider_mapping`. Choosing the three ElevenLabs
 voices is a casting decision.
+
+## 6k. The content import — reported done, not verified here
+
+The five `nervous_ready` modules were imported by the product owner on
+2026-09-10, run locally with a service-role key.
+
+**This session could not verify it, and did not.** The content tables are
+service-role only and the key is deliberately absent from this environment, so
+anon reads return `[]` — which is what they return whether the import wrote five
+rows or none. Reporting that as the live state would be reporting a permission
+denial as data.
+
+Verification output was requested twice and lost in transit both times. It is
+outstanding.
+
+### What was checked before the import, and passed
+
+- **Script integrity, by SHA-256.** All five `script_text` values matched the
+  approved production pack exactly, at 190 / 248 / 335 / 381 / 99 characters.
+  Programmatic, because a transcription slip in approved content is silent.
+- **Records-only validation** — exit 0, with audio checks not run and not
+  claimed.
+- **Dry run** — 5 module rows, 5 `en` version rows, **0 renditions**, 0 approved.
+
+### What is known from outside the boundary
+
+`compose` returns **`library_empty`** at 300 / 600 / 1200 seconds. That proves
+**no module passes `approved = true AND is_active = true`** — which is correct
+at this stage, content being approved and audio not existing.
+
+It does **not** confirm the row count: an empty table and five unapproved rows
+produce the identical answer. So the import is recorded here as *reported
+complete*, not as verified.
+
+### To close it
+
+Run the read-only block against the live database with the key set, and check:
+five module keys with `approved false` / `is_active true`; five `en` versions
+with `approved_at` set and `withdrawn_at` null; `script_chars` of
+190 / 248 / 335 / 381 / 99; zero renditions; zero provider mappings.
 
 ## 7. Known gaps
 
