@@ -70,7 +70,7 @@ branches, local or remote.
 | Tip | `6096fc8` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
-| Database | all 12 migrations applied |
+| Database | all 15 migrations applied |
 
 The repository, the database and the deployed functions are in agreement for
 the first time since the completion pass. An earlier version of this section
@@ -276,7 +276,8 @@ Moving the confirm step cannot quietly open a path around the gate.
 | `supabase/functions/_shared/allocate.ts` | Allocation and selection. **Server-side only.** |
 | `supabase/functions/_shared/compose.ts` | Decision to manifest. **Server-side only.** |
 | `supabase/functions/_shared/speech.ts` | TTS budget and derived cache keys. **Server-side only.** |
-| `supabase/functions/_shared/provider.ts` | Provider adapter boundary. No vendor wired. |
+| `supabase/functions/_shared/provider.ts` | Provider adapter boundary. |
+| `supabase/functions/_shared/elevenlabs.ts` | ElevenLabs behind that boundary. **Never called live.** See §6h. |
 | `supabase/functions/_shared/novelty.ts` | Manifest fingerprint and recency scoring. **Server-side only. Not yet called by the composer.** |
 | `supabase/functions/_shared/replay.ts` | Exact replay and reuse-intent. **Server-side only. Not yet called by the composer.** |
 | `supabase/functions/_shared/cost.ts` | Cost rows from a manifest. Dormant — nothing generates yet. |
@@ -328,6 +329,9 @@ would put unapproved or placeholder material in front of a person.
 | `20260909160000_novelty_and_saved_sessions` | yes |
 | `20260909180000_persist_fingerprint` | yes |
 | `20260910100000_voice_profiles_and_renditions` | yes |
+| `20260910140000_locales_and_provider_voices` | yes |
+| `20260910150000_bright_inactive_until_mapped` | yes |
+| `20260910170000_approved_script_text` | yes |
 
 Catalogue era: `transitions`, `sessions_catalogue`, `session_segments`,
 `safety_events`, `user_sessions`, `session_outcomes`.
@@ -829,7 +833,11 @@ measured length. It is the only honest value available before recording and is
 wrong the moment audio exists; the validator's 0.25s tolerance will reject it,
 which is the correct outcome.
 
-## 6g. Two narration voices
+## 6g. Narration voices
+
+> Written when there were two. There are now **three** product profiles —
+> `warm`, `clear` and `bright` — of which `bright` is inactive until it has a
+> provider binding. See §6i for the multilingual pass that added it.
 
 V1 offers a person a choice of two voices, `warm` and `clear`. Internal product
 labels, not descriptions of a person and not gender classifications; the display
@@ -1137,6 +1145,12 @@ natural first step and would fail immediately.
 |---:|---|---|---|
 | 1 | ~~Load the scripts into `script_text`~~ **done** | — | — |
 | 2 | Import the five modules and their `en` version rows | a service-role key | `unknown_module` |
+
+**Step 2 is READY TO COMMIT.** Integrity checked programmatically on
+2026-09-10 — all five `script_text` values match the approved pack exactly, by
+SHA-256, at 190 / 248 / 335 / 381 / 99 characters. Records-only validation
+passes and the dry run plans exactly 5 module rows, 5 `en` version rows and
+**0 renditions**. Only the service-role key is missing.
 
 Step 2 writes module rows and version rows carrying the approved scripts, and
 **no renditions** — a rendition is a recording, and none exists yet. That also
