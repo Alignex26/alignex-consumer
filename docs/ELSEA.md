@@ -46,8 +46,10 @@ Last updated: 2026-09-09.
 | Lint | clean |
 | Migrations | 14 written, **all applied** |
 | Edge functions | `interpret`, `compose` and `voice-check` deployed and current |
-| Deployment parity | current — marker `d4e73de8`; `compose` and `voice-check` redeployed 2026-09-10 for the ElevenLabs adapter |
+| Deployment parity | current — marker `e4cabefa`; `compose` and `voice-check` redeployed 2026-09-10 for locale-aware resolution |
 | Audio content | **none exists** |
+| Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content exists** |
+| Voices | `warm` and `clear` active; `bright` exists but is **not mapped or selectable** |
 | Blocking | recorded voice masters. Scripts approved; provider wired but never called live. |
 
 **The product runs end to end today** on the catalogue path, as a correctly
@@ -65,7 +67,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `e5a113b` |
+| Tip | `3470acf` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 12 migrations applied |
