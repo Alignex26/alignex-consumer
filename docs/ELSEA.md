@@ -41,10 +41,10 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 435 passing across 15 suites |
+| Tests | 467 passing across 16 suites |
 | TypeScript | clean |
 | Lint | clean |
-| Migrations | 11 written, **all applied** |
+| Migrations | 12 written, **all applied** |
 | Edge functions | `interpret` and `compose` deployed and current (`npm run deploy:check`) |
 | Deployment parity | current — marker `1cfe45f`; every commit since is documentation, and no function *source* has changed (only the marker file itself, which the check excludes) |
 | Audio content | **none exists** |
@@ -68,7 +68,7 @@ branches, local or remote.
 | Tip | `eb36be1` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
-| Database | all 11 migrations applied |
+| Database | all 12 migrations applied |
 
 The repository, the database and the deployed functions are in agreement for
 the first time since the completion pass. An earlier version of this section
@@ -310,7 +310,7 @@ over on its own when approved content lands.
 Nothing here invents content. The validator's job is to refuse a manifest that
 would put unapproved or placeholder material in front of a person.
 
-### Database — 11 migrations, all applied
+### Database — 12 migrations, all applied
 
 | Migration | Applied |
 |---|---|
@@ -325,6 +325,7 @@ would put unapproved or placeholder material in front of a person.
 | `20260909140000_ingestion_and_atomic_manifest` | yes |
 | `20260909160000_novelty_and_saved_sessions` | yes |
 | `20260909180000_persist_fingerprint` | yes |
+| `20260910100000_voice_profiles_and_renditions` | yes |
 
 Catalogue era: `transitions`, `sessions_catalogue`, `session_segments`,
 `safety_events`, `user_sessions`, `session_outcomes`.
@@ -371,7 +372,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 435 across 15 suites
+### Tests — 467 across 16 suites
 
 | Suite | Covers |
 |---|---|
@@ -825,6 +826,71 @@ before import or defer deliberately, knowing what gets written.
 measured length. It is the only honest value available before recording and is
 wrong the moment audio exists; the validator's 0.25s tolerance will reject it,
 which is the correct outcome.
+
+## 6g. Two narration voices
+
+V1 offers a person a choice of two voices, `warm` and `clear`. Internal product
+labels, not descriptions of a person and not gender classifications; the display
+label is all anyone sees.
+
+### The shape
+
+    module  +  version  +  voice profile  =  one audio rendition
+
+A module's identity is its technique, its wording and its approval. None of that
+changes because a different person read it aloud, so **a second voice must not
+create a second module** — that would fork effectiveness data, double the
+library, and leave two rows to keep in step by hand.
+
+`module_renditions` carries only what is true of a particular recording: its
+storage path, its length and whether that take is approved.
+`intervention_modules.storage_path` is deprecated by the migration and made
+nullable; nothing reads it. Nothing was migrated because the library is empty.
+
+### Both approvals must hold
+
+The module's `approved` says the content is approved. The rendition's says this
+recording of it is. A bad take of approved wording is not playable, and
+approving a module does not bless every future recording of it.
+
+### Selection is unchanged
+
+The composer chooses modules **first**, on their own merits, and only then picks
+which recording of each to play. It plans with the module's canonical duration,
+so the same techniques are chosen whichever voice is playing — the voice changes
+how a session sounds, never what it contains.
+
+Falls back **per module** to the default voice, so a library where only some
+modules exist in `clear` still composes: those play warm rather than dropping
+out. A module with no approved rendition in either voice is removed before
+selection, never substituted.
+
+### The preference
+
+`user_preferences`, own-row RLS, defaulting to `warm`. A saved preference beats
+whatever the client sends — a stale client must not override what somebody
+chose. Nothing joins to it except audio resolution, so changing voice cannot
+disturb session history, module identity, effectiveness or recipe selection.
+
+Chosen on the existing Audio preferences screen, which was built as a routed
+shell for exactly this. Functional only; no design pass.
+
+### RLS
+
+`voice_profiles` is readable — two labels, visible in the app the moment the
+picker opens. `module_renditions` is service-role only, because storage paths
+are the same class of IP as the recipes. Verified live: anon reads renditions as
+`[]`, and an anon write to `user_preferences` returns 401.
+
+### Recording
+
+Two folders, `audio-source/warm/` and `audio-source/clear/`, the same five
+approved scripts in each, and `prepare-voice-masters.mjs --voice <id>`. The
+audio specification and the duration ceilings are unchanged and identical
+across voices.
+
+**Not proven on device**, like everything downstream of the composer: no
+renditions exist, so nothing has ever resolved one.
 
 ## 7. Known gaps
 

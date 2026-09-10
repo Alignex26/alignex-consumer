@@ -27,6 +27,11 @@ declare module 'jsr:@supabase/supabase-js@2' {
 
   interface Filter<T> extends PostgrestResult<T[]> {
     eq(column: string, value: unknown): Filter<T>;
+    // Added 2026-09-10 for voice-rendition resolution. These stubs are
+    // hand-written and cover only what the functions actually call, so a real
+    // supabase-js method is missing here until something needs it.
+    in(column: string, values: readonly unknown[]): Filter<T>;
+    maybeSingle(): PostgrestResult<T>;
     order(column: string, options?: { ascending?: boolean }): Filter<T>;
     select(columns?: string): Filter<T>;
     single(): PostgrestResult<T>;

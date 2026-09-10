@@ -115,7 +115,22 @@ delivery. Must remain ≤11 seconds.
 
 ## Recording and preparation
 
-**Put raw recordings here:** `content/nervous_ready/audio-source/`
+### Two voices
+
+V1 ships **two narration voices**, `warm` and `clear`. **The same five approved
+scripts are recorded twice** — the technique, the wording and the approval are
+identical, and only the recording differs. Do not vary the words between them.
+
+`warm` is the default and the fallback: if a module has no `clear` recording,
+that module plays warm rather than dropping out of the session. So warm can be
+recorded first and shipped alone.
+
+**Put raw recordings here:**
+
+```
+content/nervous_ready/audio-source/warm/
+content/nervous_ready/audio-source/clear/
+```
 
 Name each raw file after its module key — any common format:
 `nr_arrive_short.wav`, `.m4a`, `.mp3`, `.aiff`, `.flac`.
@@ -124,16 +139,20 @@ Record clean and dry: **no fades, no music, no processing.** Loudness, peak
 and silence trimming are applied by the command below, and a fade already in
 the file would be applied twice by the player.
 
-**Then run:**
+**Then run, once per voice:**
 
 ```bash
-node scripts/prepare-voice-masters.mjs
+node scripts/prepare-voice-masters.mjs --voice warm
+node scripts/prepare-voice-masters.mjs --voice clear
 ```
 
 It converts each raw file to the locked production specification — AAC-LC in
 `.m4a`, 44.1 kHz, mono, 96 kbps, −16 LUFS ±1, true peak ≤ −1 dBTP, head and
 tail silence trimmed to ≤100 ms, no baked-in fades — writes the masters to
-`content/nervous_ready/masters/`, and measures every one.
+`content/nervous_ready/masters/<voice>/`, and measures every one.
+
+The ceilings are identical for both voices: they are a property of the recipe,
+not of the narrator.
 
 **It rejects any recording over its ceiling.** A take that runs long is
 reported with the overage and no master is written for it. Nothing is

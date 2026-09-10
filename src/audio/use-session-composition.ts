@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { loadComposition } from '@/lib/composition';
+import { DEFAULT_VOICE, loadVoicePreference } from '@/lib/voice-preference';
 import type { Interpretation } from '@/types/elsea';
 import type { CompositionFailure, SessionManifest } from '@/types/session-engine';
 
@@ -45,7 +46,13 @@ export function useSessionComposition(
         return;
       }
 
-      const result = await loadComposition(transitionKey, durationSeconds, userId);
+      // The saved voice, read before composing. A failure here resolves to the
+      // default rather than propagating: a preference that cannot be read must
+      // not stop a session starting.
+      const voice = await loadVoicePreference(userId).catch(() => DEFAULT_VOICE);
+      if (cancelled) return;
+
+      const result = await loadComposition(transitionKey, durationSeconds, userId, voice);
       if (cancelled) return;
 
       if (result.ok) {

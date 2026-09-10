@@ -27,10 +27,23 @@ const args = process.argv.slice(2);
 const manifestPath = args.find((a) => !a.startsWith('--'));
 const commit = args.includes('--commit');
 const allowUnverified = args.includes('--allow-unverified-audio');
+const voiceIndex = args.indexOf('--voice');
+/**
+ * Which narration voice these recordings are.
+ *
+ * The manifest is voice-agnostic on purpose: it describes the MODULE — the
+ * technique, the wording, the approval — and all of that is identical across
+ * voices. Only the recording differs, so the same manifest is imported once
+ * per voice with a different --voice and a different audio folder.
+ */
+const voice = voiceIndex >= 0 ? args[voiceIndex + 1] : 'warm';
 const audioDirIndex = args.indexOf('--audio-dir');
 const audioDir = audioDirIndex >= 0 ? args[audioDirIndex + 1] : null;
 
 const BUCKET = 'intervention-audio';
+
+/** modules/<family>/<key>.m4a  ->  modules/<voice>/<family>/<key>.m4a */
+const renditionPath = (path, voiceId) => path.replace(/^modules\//, `modules/${voiceId}/`);
 
 if (!manifestPath) {
   console.error('usage: node scripts/modules-import.mjs <manifest.json> --audio-dir <dir> [--commit]');
@@ -153,7 +166,10 @@ for (const p of plan) {
   }
 
   const bytes = readFileSync(p.audio);
-  const response = await fetch(`${url}/storage/v1/object/${BUCKET}/${p.path}`, {
+  // Renditions are filed by voice, so two recordings of the same module do not
+  // collide: modules/<voice>/<family>/<key>.m4a
+  const objectPath = renditionPath(p.path, voice);
+  const response = await fetch(`${url}/storage/v1/object/${BUCKET}/${objectPath}`, {
     method: 'POST',
     headers: {
       apikey: serviceKey,
@@ -249,6 +265,52 @@ if (!versionResult.ok) {
 }
 
 const newVersions = JSON.parse(versionResult.body).length;
+
+// --- renditions ------------------------------------------------------------
+//
+// One row per (module, version, voice). This is what the composer resolves to
+// find the audio, and it is the reason a second voice does not fork the
+// library: the module row, its technique, its wording and its approval are
+// untouched by importing another recording.
+//
+// `approved` is copied from the manifest exactly as given, like everything
+// else. A rendition of approved content is not itself approved until somebody
+// says so.
+const renditionRows = imported.map((row) => ({
+  module_id: row.id,
+  version: row.version,
+  voice_profile: voice,
+  storage_path: renditionPath(row.storage_path, voice),
+  duration_seconds: row.duration_seconds,
+  approved: row.approved === true,
+  approved_at: row.approved ? row.approved_at : null,
+  updated_at: new Date().toISOString(),
+}));
+
+const renditionResult = await rest(
+  '/rest/v1/module_renditions?on_conflict=module_id,version,voice_profile',
+  {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify(renditionRows),
+  }
+);
+
+if (!renditionResult.ok) {
+  console.error(
+    `
+  Module rows were written, but the ${voice} renditions were not:
+` +
+    `  ${renditionResult.status} ${renditionResult.body}
+
+` +
+    `  The modules exist with no audio attached for this voice, so the composer
+` +
+    `  will not select them. Fix and re-run.
+`
+  );
+  process.exit(1);
+}
 
 console.log(`\n  Uploaded ${uploaded} file(s). Wrote ${rows.length} module row(s).`);
 console.log(`  Recorded ${newVersions} new version row(s); ${versionRows.length - newVersions} already present.`);

@@ -1,4 +1,5 @@
 import { getSupabase } from '@/lib/supabase';
+import type { VoiceProfileId } from '@/lib/voice-preference';
 import type { TransitionKey } from '@/types/elsea';
 import type {
   CompositionFailure,
@@ -108,7 +109,16 @@ function toSegment(wire: WireSegment): ManifestSegment | null {
 export async function loadComposition(
   transitionKey: TransitionKey,
   durationSeconds: number,
-  _userId: string | null
+  _userId: string | null,
+  /**
+   * The narration voice to prefer.
+   *
+   * Passed as a hint only. For a signed-in person the composer reads their
+   * saved preference and that wins — a stale client must not override what
+   * somebody actually chose. This matters for the signed-out case and for the
+   * moment just after choosing, before the write has landed.
+   */
+  voiceProfile?: VoiceProfileId
 ): Promise<CompositionResult> {
   const supabase = getSupabase();
   if (!supabase) return { ok: false, failure: 'library_empty' };
@@ -118,7 +128,11 @@ export async function loadComposition(
     // attaches, never in the body. A caller must not be able to compose using
     // somebody else's effectiveness history by naming them.
     const { data, error } = await supabase.functions.invoke<WireResponse>('compose', {
-      body: { transition_key: transitionKey, duration_seconds: durationSeconds },
+      body: {
+        transition_key: transitionKey,
+        duration_seconds: durationSeconds,
+        ...(voiceProfile ? { voice_profile: voiceProfile } : {}),
+      },
     });
 
     if (error || !data) return { ok: false, failure: 'library_empty' };

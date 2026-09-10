@@ -216,7 +216,7 @@ async function persistManifest(
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ ok: false, failure: "method_not_allowed" }, 405);
 
-  let body: { transition_key?: unknown; duration_seconds?: unknown };
+  let body: { transition_key?: unknown; duration_seconds?: unknown; voice_profile?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -225,6 +225,14 @@ Deno.serve(async (req: Request) => {
 
   const transitionKey = String(body.transition_key ?? "");
   const durationSeconds = Number(body.duration_seconds ?? 0);
+
+  // The voice the caller asked for. A saved preference is read from the
+  // database below and wins over this; the body is only how a signed-out
+  // person, or one who has just chosen on the picker, expresses a choice.
+  // Unrecognised values are ignored rather than rejected: a voice this build
+  // does not know about is a reason to use the default, not to fail a session.
+  const requestedVoice =
+    typeof body.voice_profile === "string" ? body.voice_profile : null;
 
   // Closed vocabulary. The caller cannot compose for a transition that does
   // not exist, and cannot ask for an unbounded session.
@@ -250,6 +258,35 @@ Deno.serve(async (req: Request) => {
     const { data } = await admin.auth.getUser(authHeader.slice(7));
     userId = data?.user?.id ?? null;
   }
+
+  // ---- Which voice ---------------------------------------------------------
+  //
+  // A saved preference is authoritative for a signed-in person: it is what
+  // they chose, and a stale client should not override it. Everything falls
+  // back to the profile marked default, so an unknown or retired voice
+  // resolves rather than failing.
+  const { data: profileRows } = await admin
+    .from("voice_profiles")
+    .select("id, is_default")
+    .eq("is_active", true);
+
+  const profiles = (profileRows ?? []) as { id: string; is_default: boolean }[];
+  const defaultVoice = profiles.find((p) => p.is_default)?.id ?? "warm";
+
+  let savedVoice: string | null = null;
+  if (userId) {
+    const { data } = await admin
+      .from("user_preferences")
+      .select("voice_profile")
+      .eq("user_id", userId)
+      .maybeSingle();
+    savedVoice = (data as { voice_profile?: string } | null)?.voice_profile ?? null;
+  }
+
+  const known = (v: string | null) =>
+    v !== null && profiles.some((p) => p.id === v) ? v : null;
+
+  const voice = known(savedVoice) ?? known(requestedVoice) ?? defaultVoice;
 
   // ---- The recipe ---------------------------------------------------------
   const { data: phaseRows } = await admin
@@ -295,6 +332,49 @@ Deno.serve(async (req: Request) => {
   const modules = (moduleRows ?? []) as ModuleRow[];
   if (modules.length === 0) return fail("library_empty");
 
+  // ---- Which recording of each module -------------------------------------
+  //
+  // A module's identity is its technique, its wording and its approval. None of
+  // that changes because a different person read it. So the module is chosen
+  // first, on its own merits, and only then does the voice decide WHICH
+  // RECORDING of it plays.
+  //
+  // BOTH approvals must hold. The module's flag says the content is approved;
+  // the rendition's says this recording of it is. A bad take of approved
+  // wording is not playable, and approving a module does not bless every future
+  // recording of it.
+  const { data: renditionRows } = await admin
+    .from("module_renditions")
+    .select("module_id, voice_profile, storage_path, duration_seconds")
+    .eq("approved", true)
+    .eq("is_active", true)
+    .in("voice_profile", [voice, defaultVoice])
+    .in("module_id", modules.map((m) => m.id));
+
+  const renditions = (renditionRows ?? []) as {
+    module_id: string;
+    voice_profile: string;
+    storage_path: string;
+    duration_seconds: number;
+  }[];
+
+  // Requested voice wins; the default is the fallback. Resolved per module, so
+  // a library where only some modules have been recorded in the second voice
+  // still composes — those modules simply play in the default voice rather than
+  // dropping out of the session.
+  const audioFor = new Map<string, string>();
+  for (const r of renditions) {
+    if (r.voice_profile === voice) audioFor.set(r.module_id, r.storage_path);
+    else if (!audioFor.has(r.module_id)) audioFor.set(r.module_id, r.storage_path);
+  }
+
+  // A module with no approved rendition in either voice has nothing to play.
+  // It is removed BEFORE selection rather than substituted afterwards: the
+  // allocator must never choose something that cannot sound, and nothing
+  // unapproved is ever put in its place.
+  const playable = modules.filter((m) => audioFor.has(m.id));
+  if (playable.length === 0) return fail("library_empty");
+
   // ---- This person's history ---------------------------------------------
   let effectiveness: { moduleId: string; positive: number; total: number }[] = [];
   if (userId) {
@@ -320,7 +400,14 @@ Deno.serve(async (req: Request) => {
   // A module qualifies on FAMILY ELIGIBILITY, never on merely existing. A phase
   // whose families match nothing approved cannot be filled and the composition
   // fails, which is correct: better no session than an unapproved one.
-  const library = modules.map(toModule);
+  // Rendition paths, not the deprecated per-module one. Durations stay the
+  // module's: the allocator plans with the canonical length so the SAME
+  // techniques are chosen whichever voice is playing. Only the recording
+  // differs, which is the whole point.
+  const library = playable.map((row) => ({
+    ...toModule(row),
+    storagePath: audioFor.get(row.id)!,
+  }));
   const modulesByPhase: Record<string, InterventionModule[]> = {};
 
   for (const phase of phases) {
@@ -375,7 +462,7 @@ Deno.serve(async (req: Request) => {
   // The composition's identity, built from the module versions actually used.
   // Recorded, not acted upon: no recency penalty is applied anywhere in this
   // function, and none will be until the lookback and weighting are decided.
-  const versions = new Map(modules.map((row) => [row.id, row.version]));
+  const versions = new Map(playable.map((row) => [row.id, row.version]));
   const fingerprint = manifestFingerprint(manifest, versions);
 
   const manifestId = await persistManifest(admin, userId, manifest, fingerprint);

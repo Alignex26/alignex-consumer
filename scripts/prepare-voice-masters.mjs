@@ -3,10 +3,14 @@
 // Turns raw voice recordings into production masters, and refuses anything
 // that does not belong in the library.
 //
-//   node scripts/prepare-voice-masters.mjs [--in <dir>] [--out <dir>]
+//   node scripts/prepare-voice-masters.mjs --voice warm
+//   node scripts/prepare-voice-masters.mjs --voice clear
 //
-// IN   content/nervous_ready/audio-source/   raw takes, named <module_key>.*
-// OUT  content/nervous_ready/masters/        <module_key>.m4a, to spec
+// IN   content/nervous_ready/audio-source/<voice>/   raw takes, <module_key>.*
+// OUT  content/nervous_ready/masters/<voice>/        <module_key>.m4a, to spec
+//
+// The same approved script belongs to both voices. Only the recording differs,
+// so the ceilings, the specification and the rejection rule are identical.
 //
 // It applies the locked specification from docs/audio-production-spec.md:
 // AAC-LC in .m4a, 44.1 kHz, mono, 96 kbps, -16 LUFS +/-1, true peak <= -1 dBTP,
@@ -30,8 +34,25 @@ const pick = (flag, fallback) => {
   return i >= 0 ? args[i + 1] : fallback;
 };
 
-const IN = pick('--in', join('content', 'nervous_ready', 'audio-source'));
-const OUT = pick('--out', join('content', 'nervous_ready', 'masters'));
+/**
+ * Which narration voice is being prepared. V1 has two.
+ *
+ * The scripts, the techniques and the ceilings are identical across voices --
+ * only the recording differs -- so this only selects which subfolder of takes
+ * is read and where the masters are written.
+ */
+const VOICES = ['warm', 'clear'];
+const voice = pick('--voice', 'warm');
+
+if (!VOICES.includes(voice)) {
+  console.error(`
+  Unknown voice "${voice}". V1 has: ${VOICES.join(', ')}
+`);
+  process.exit(2);
+}
+
+const IN = pick('--in', join('content', 'nervous_ready', 'audio-source', voice));
+const OUT = pick('--out', join('content', 'nervous_ready', 'masters', voice));
 
 /** From the approved manifest. Ceilings are hard. */
 const CEILINGS = {
@@ -114,7 +135,7 @@ for (const entry of readdirSync(IN)) {
 
 const missing = Object.keys(CEILINGS).filter((k) => !takes.has(k));
 
-console.log(`\n  Preparing voice masters\n  from ${IN}\n  to   ${OUT}\n`);
+console.log(`\n  Preparing ${voice} voice masters\n  from ${IN}\n  to   ${OUT}\n`);
 
 if (takes.size === 0) {
   console.log('  No recordings found.\n');
