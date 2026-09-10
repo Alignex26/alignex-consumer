@@ -46,9 +46,9 @@ Last updated: 2026-09-09.
 | Lint | clean |
 | Migrations | 12 written, **all applied** |
 | Edge functions | `interpret`, `compose` and `voice-check` deployed and current |
-| Deployment parity | current — marker `b9d55b12`; `compose` redeployed 2026-09-10 for voice-rendition resolution |
+| Deployment parity | current — marker `d4e73de8`; `compose` and `voice-check` redeployed 2026-09-10 for the ElevenLabs adapter |
 | Audio content | **none exists** |
-| Blocking | approved intervention content and audio. All 5 recipes specified. |
+| Blocking | recorded voice masters. Scripts approved; provider wired but never called live. |
 
 **The product runs end to end today** on the catalogue path, as a correctly
 timed session with no sound. The whole flow — safety gate, interpretation,
@@ -65,7 +65,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `c314d77` |
+| Tip | `e5a113b` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 12 migrations applied |
