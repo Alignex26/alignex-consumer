@@ -27,6 +27,10 @@ const valid = (over: Record<string, unknown> = {}) => ({
   storage_path: 'modules/orient/probe_module.m4a',
   duration_seconds: 20,
   intensity: 5,
+  // The approved wording. Required since the master generator was built: it is
+  // what a server speaks, and a version with no script cannot be generated
+  // from. A stand-in here, like technique_key above.
+  script_text: 'A structurally valid stand-in. Not content.',
   requires_headphones: false,
   is_bed: false,
   approved: false,

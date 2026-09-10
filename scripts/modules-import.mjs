@@ -263,6 +263,11 @@ if (!result.ok) {
 // ignored rather than being an error. Bumping `version` in the manifest is
 // what publishes a new one.
 const imported = JSON.parse(result.body);
+// The script comes from the manifest, not from the returned row: it is content,
+// and `intervention_modules` does not carry it. Matched by module_key so a
+// reordered response cannot pair a script with the wrong module.
+const scriptFor = new Map(modules.map((m) => [m.module_key, m.script_text]));
+
 const versionRows = imported.map((row) => ({
   module_id: row.id,
   version: row.version,
@@ -270,8 +275,26 @@ const versionRows = imported.map((row) => ({
   duration_seconds: row.duration_seconds,
   technique_key: row.technique_key,
   locale,
+  // THE APPROVED WORDING. This is what a server-side generator will speak, so
+  // it must be the approved text and nothing else. The validator has already
+  // refused a manifest without it.
+  script_text: scriptFor.get(row.module_key) ?? null,
   approved_at: row.approved ? row.approved_at : null,
 }));
+
+const missingScript = versionRows.filter((r) => !r.script_text);
+if (missingScript.length > 0) {
+  console.error(
+    `
+  ${missingScript.length} version row(s) would be written with no script.
+` +
+    `  A version with no wording cannot be generated from, and writing one now
+` +
+    `  would create an approved-looking row that nothing can speak.
+`
+  );
+  process.exit(1);
+}
 
 const versionResult = await rest(
   '/rest/v1/intervention_module_versions?on_conflict=module_id,locale,version',

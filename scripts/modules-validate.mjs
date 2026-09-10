@@ -187,6 +187,19 @@ for (const [index, m] of modules.entries()) {
     fail(key, 'approved must be explicitly true or false');
   }
 
+  // Script — the approved localised wording.
+  //
+  // Required, because it is what a server-side generator will speak. Without it
+  // the only way to synthesise a master is to hand text to an endpoint, and an
+  // endpoint that accepts text and speaks it can say anything.
+  if (typeof m.script_text !== 'string' || m.script_text.trim() === '') {
+    fail(key, 'script_text is required — the approved wording, exactly as approved');
+  } else if (m.script_text.trim() !== m.script_text) {
+    fail(key, 'script_text has leading or trailing whitespace');
+  } else if (/CONTENT_AUTHORING_REQUIRED|TODO|TBD|PLACEHOLDER|Lorem/i.test(m.script_text)) {
+    fail(key, 'script_text still contains a placeholder — content has not been authored');
+  }
+
   // Version — how replacement audio is published. Optional (a first import is
   // version 1), but if given it must be a positive integer, because it becomes
   // an immutable history row and part of a saved session's identity.

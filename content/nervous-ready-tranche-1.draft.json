@@ -8,7 +8,8 @@
     "requires_headphones": false,
     "is_bed": false,
     "version": 1,
-    "approved": false
+    "approved": false,
+    "script_text": "Come back to where you actually are. Let your eyes rest on one thing around you. Feel the surface supporting you. Notice your feet or your hands. Nothing needs solving yet. Just arrive here."
   },
   {
     "module_key": "nr_regulate_short",
@@ -19,7 +20,8 @@
     "requires_headphones": false,
     "is_bed": false,
     "version": 1,
-    "approved": false
+    "approved": false,
+    "script_text": "Notice where the tension is sitting — your jaw, shoulders, chest or stomach. You don't have to force it away. Breathe in gently, then let the out-breath be a little longer. Again. In, easy. Out, slower. Let your shoulders soften as you breathe out."
   },
   {
     "module_key": "nr_reframe_short",
@@ -30,7 +32,8 @@
     "requires_headphones": false,
     "is_bed": false,
     "version": 1,
-    "approved": false
+    "approved": false,
+    "script_text": "That nervous feeling doesn't automatically mean you're not ready. It can simply mean this matters and your system is switched on. You don't have to get rid of the energy. You can give it a job. Let it sharpen your attention. Let it remind you to stay present. You can feel nerves and still move well. Both can be true at the same time."
   },
   {
     "module_key": "nr_prepare_short",
@@ -41,7 +44,8 @@
     "requires_headphones": false,
     "is_bed": false,
     "version": 1,
-    "approved": false
+    "approved": false,
+    "script_text": "Now bring to mind the very first moment you need to handle. Not the whole thing — just the beginning. What do you need to do first? Maybe walk in, make the call, say the opening line, or take your place. See yourself doing that one thing steadily. Choose one simple cue: shoulders down, eyes up, start slowly. You don't need the whole thing mapped out. You only need the next move."
   },
   {
     "module_key": "nr_close_short",
@@ -52,6 +56,7 @@
     "requires_headphones": false,
     "is_bed": false,
     "version": 1,
-    "approved": false
+    "approved": false,
+    "script_text": "You don't need to feel fearless. Take this steadier version of you with you. You're ready to begin."
   }
 ]

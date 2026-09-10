@@ -1135,7 +1135,7 @@ natural first step and would fail immediately.
 
 | # | Step | Blocked on | Fails with if skipped |
 |---:|---|---|---|
-| 1 | Load the five approved scripts into `script_text` | the scripts exist in the pack, not the database | `no_approved_script` |
+| 1 | ~~Load the scripts into `script_text`~~ **done** | — | — |
 | 2 | Import the five modules and their `en` version rows | a service-role key | `unknown_module` |
 | 3 | Map three ElevenLabs voices in `provider_voice_mappings` | **a casting decision** | `no_provider_mapping` |
 | 4 | Generate one master | steps 1–3 | — |
@@ -1147,10 +1147,17 @@ natural first step and would fail immediately.
 resolves a voice, so an unmapped voice is not even the first thing that fails
 today — `unknown_module` is, because nothing has been imported.
 
-Step 2 is the existing importer, which already writes module rows, immutable
-version rows and renditions. `script_text` is the one field it does not yet
-populate: the scripts live in `nervous-ready-production-pack.md`, and moving
-them into the manifest is a small ingestion change, not a design question.
+**Step 1 is done.** The five approved scripts now live in
+`content/nervous-ready-tranche-1.draft.json` as `script_text`, and the importer
+writes them onto the version rows. They were extracted from the production pack
+programmatically rather than retyped — a transcription slip in approved content
+would be silent, and the character counts (190, 248, 335, 381, 99) independently
+match what the ElevenLabs generator computes from its own copy.
+
+The validator now **requires** `script_text` and rejects a placeholder, so a
+manifest cannot be imported with wording missing. The importer refuses to write
+a version row with no script: a version nothing can speak would sit in the
+database looking approved.
 
 ### Status
 
