@@ -46,7 +46,7 @@ Last updated: 2026-09-09.
 | Lint | clean |
 | Migrations | 15 written, **all applied** |
 | Edge functions | `interpret`, `compose`, `voice-check`, `generate-master` deployed and current |
-| Deployment parity | current — marker `e4cabefa`; `compose` and `voice-check` redeployed 2026-09-10 for locale-aware resolution |
+| Deployment parity | current — marker `14b7dc42`; `generate-master` deployed 2026-09-10 |
 | Audio content | **none exists** |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content exists** |
 | Voices | `warm` and `clear` active; `bright` exists but is **not mapped or selectable** |
@@ -67,7 +67,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `3470acf` |
+| Tip | `c722220` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 12 migrations applied |
@@ -1127,6 +1127,30 @@ SUPABASE_SERVICE_ROLE_KEY=... node scripts/finalise-master.mjs   --module nr_arr
 
 Verified live: the anon key gets `forbidden`, a GET gets
 `method_not_allowed`.
+
+### The order this has to happen in
+
+Not obvious, and easy to get wrong — mapping the voices first looks like the
+natural first step and would fail immediately.
+
+| # | Step | Blocked on | Fails with if skipped |
+|---:|---|---|---|
+| 1 | Load the five approved scripts into `script_text` | the scripts exist in the pack, not the database | `no_approved_script` |
+| 2 | Import the five modules and their `en` version rows | a service-role key | `unknown_module` |
+| 3 | Map three ElevenLabs voices in `provider_voice_mappings` | **a casting decision** | `no_provider_mapping` |
+| 4 | Generate one master | steps 1–3 | — |
+| 5 | Finalise: convert, measure, publish unapproved | ffmpeg locally | — |
+| 6 | Listen, then approve the rendition | a human | rendition never plays |
+| 7 | Approve the module for playback | a human | `library_empty` |
+
+**Steps 1 and 2 come before 3.** The generator resolves a module before it
+resolves a voice, so an unmapped voice is not even the first thing that fails
+today — `unknown_module` is, because nothing has been imported.
+
+Step 2 is the existing importer, which already writes module rows, immutable
+version rows and renditions. `script_text` is the one field it does not yet
+populate: the scripts live in `nervous-ready-production-pack.md`, and moving
+them into the manifest is a small ingestion change, not a design question.
 
 ### Status
 
