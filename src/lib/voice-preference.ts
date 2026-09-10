@@ -23,7 +23,44 @@ import { getSupabase } from '@/lib/supabase';
 export const VOICE_PROFILES = [
   { id: 'warm', label: 'Warm' },
   { id: 'clear', label: 'Clear' },
+  { id: 'bright', label: 'Bright' },
 ] as const;
+
+/**
+ * Languages the product knows about.
+ *
+ * `contentReady` is the only thing that decides whether a language can be
+ * offered: it means a COMPLETE approved library exists in it. The planned
+ * locales are recorded so the model is exercised, and are all false — no
+ * translated content exists.
+ *
+ * ELSEA is MULTILINGUAL-READY, not multilingual. A schema that can represent a
+ * language is not a language the product supports.
+ */
+export const LOCALES = [
+  { id: 'en', label: 'English', contentReady: true },
+  { id: 'es', label: 'Español', contentReady: false },
+  { id: 'de', label: 'Deutsch', contentReady: false },
+  { id: 'fr', label: 'Français', contentReady: false },
+  { id: 'pt-BR', label: 'Português (Brasil)', contentReady: false },
+] as const;
+
+export type LocaleId = (typeof LOCALES)[number]['id'];
+
+export const DEFAULT_LOCALE: LocaleId = 'en';
+
+/** Only a content-ready language may be offered or composed from. */
+export function selectableLocales() {
+  return LOCALES.filter((l) => l.contentReady);
+}
+
+export function isLocale(value: unknown): value is LocaleId {
+  return LOCALES.some((l) => l.id === value);
+}
+
+export function isSelectableLocale(value: unknown): boolean {
+  return selectableLocales().some((l) => l.id === value);
+}
 
 export type VoiceProfileId = (typeof VOICE_PROFILES)[number]['id'];
 
@@ -49,6 +86,47 @@ export function labelFor(id: VoiceProfileId): string {
  * Never throws. A preference that cannot be read must not stop a session
  * starting; it just means the default voice plays.
  */
+export type Preferences = { voice: VoiceProfileId; locale: LocaleId };
+
+export const DEFAULT_PREFERENCES: Preferences = {
+  voice: DEFAULT_VOICE,
+  locale: DEFAULT_LOCALE,
+};
+
+/**
+ * Reads both saved preferences.
+ *
+ * A language that is not content-ready resolves to the default rather than
+ * being honoured — but note that the SERVER is authoritative about this. The
+ * composer refuses an unavailable locale outright rather than substituting one,
+ * so a stale client cannot force a mixed-language session by claiming a
+ * language it should not have.
+ */
+export async function loadPreferences(userId: string | null): Promise<Preferences> {
+  if (!userId) return DEFAULT_PREFERENCES;
+
+  const supabase = getSupabase();
+  if (!supabase) return DEFAULT_PREFERENCES;
+
+  try {
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select('voice_profile, locale')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error || !data) return DEFAULT_PREFERENCES;
+
+    const row = data as { voice_profile?: unknown; locale?: unknown };
+    return {
+      voice: isVoiceProfile(row.voice_profile) ? row.voice_profile : DEFAULT_VOICE,
+      locale: isSelectableLocale(row.locale) ? (row.locale as LocaleId) : DEFAULT_LOCALE,
+    };
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+}
+
 export async function loadVoicePreference(userId: string | null): Promise<VoiceProfileId> {
   if (!userId) return DEFAULT_VOICE;
 

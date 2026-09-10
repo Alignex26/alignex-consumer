@@ -216,7 +216,12 @@ async function persistManifest(
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ ok: false, failure: "method_not_allowed" }, 405);
 
-  let body: { transition_key?: unknown; duration_seconds?: unknown; voice_profile?: unknown };
+  let body: {
+    transition_key?: unknown;
+    duration_seconds?: unknown;
+    voice_profile?: unknown;
+    locale?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -233,6 +238,9 @@ Deno.serve(async (req: Request) => {
   // does not know about is a reason to use the default, not to fail a session.
   const requestedVoice =
     typeof body.voice_profile === "string" ? body.voice_profile : null;
+
+  const requestedLocale =
+    typeof body.locale === "string" ? body.locale : null;
 
   // Closed vocabulary. The caller cannot compose for a transition that does
   // not exist, and cannot ask for an unbounded session.
@@ -259,6 +267,30 @@ Deno.serve(async (req: Request) => {
     userId = data?.user?.id ?? null;
   }
 
+  // ---- Which language ------------------------------------------------------
+  //
+  // A LANGUAGE IS NEVER FALLEN BACK FROM. If somebody asks for Spanish and no
+  // complete approved Spanish library exists, the Spanish experience is
+  // unavailable — it does not quietly become English, and it never becomes a
+  // session with some of each. A mixed-language session would be a worse
+  // failure than no session, because nobody would report it as a bug.
+  //
+  // Only a CONTENT-READY locale is honoured. `is_enabled` is the product
+  // intention; `is_content_ready` is whether a complete approved library
+  // actually exists, and only the second can be composed from.
+  const { data: localeRows } = await admin
+    .from("locales")
+    .select("id, is_enabled, is_content_ready")
+    .eq("is_content_ready", true);
+
+  const readyLocales = (localeRows ?? []) as {
+    id: string;
+    is_enabled: boolean;
+    is_content_ready: boolean;
+  }[];
+
+  let savedLocale: string | null = null;
+
   // ---- Which voice ---------------------------------------------------------
   //
   // A saved preference is authoritative for a signed-in person: it is what
@@ -277,16 +309,32 @@ Deno.serve(async (req: Request) => {
   if (userId) {
     const { data } = await admin
       .from("user_preferences")
-      .select("voice_profile")
+      .select("voice_profile, locale")
       .eq("user_id", userId)
       .maybeSingle();
-    savedVoice = (data as { voice_profile?: string } | null)?.voice_profile ?? null;
+    const prefs = data as { voice_profile?: string; locale?: string } | null;
+    savedVoice = prefs?.voice_profile ?? null;
+    savedLocale = prefs?.locale ?? null;
   }
 
   const known = (v: string | null) =>
     v !== null && profiles.some((p) => p.id === v) ? v : null;
 
   const voice = known(savedVoice) ?? known(requestedVoice) ?? defaultVoice;
+
+  // A saved preference wins, then the request, then English. Whichever is
+  // chosen, it must be content-ready: an unavailable language FAILS rather than
+  // resolving to a different one.
+  const asked = savedLocale ?? requestedLocale ?? "en";
+  const localeReady = readyLocales.some((l) => l.id === asked);
+
+  if (!localeReady) {
+    // Named distinctly so this is never mistaken for an empty library. The
+    // caller learns the language is unavailable, not that ELSEA is broken.
+    return fail("locale_unavailable");
+  }
+
+  const locale = asked;
 
   // ---- The recipe ---------------------------------------------------------
   const { data: phaseRows } = await admin
@@ -345,18 +393,26 @@ Deno.serve(async (req: Request) => {
   // recording of it.
   const { data: renditionRows } = await admin
     .from("module_renditions")
-    .select("module_id, voice_profile, storage_path, duration_seconds")
+    .select("module_id, voice_profile, locale, storage_path, duration_seconds")
     .eq("approved", true)
     .eq("is_active", true)
+    // THE LANGUAGE BOUNDARY. Filtering here means a rendition in another
+    // language is never a candidate, so the voice fallback below cannot cross
+    // one even by accident. Voice falls back; language does not.
+    .eq("locale", locale)
     .in("voice_profile", [voice, defaultVoice])
     .in("module_id", modules.map((m) => m.id));
 
-  const renditions = (renditionRows ?? []) as {
+  const renditions = ((renditionRows ?? []) as {
     module_id: string;
     voice_profile: string;
+    locale: string;
     storage_path: string;
     duration_seconds: number;
-  }[];
+  }[])
+    // Belt and braces. The query already filters, and a rendition from another
+    // language must not survive a future refactor of that query either.
+    .filter((r) => r.locale === locale);
 
   // Requested voice wins; the default is the fallback. Resolved per module, so
   // a library where only some modules have been recorded in the second voice

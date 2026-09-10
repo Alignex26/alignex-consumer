@@ -37,13 +37,41 @@ const voiceIndex = args.indexOf('--voice');
  * per voice with a different --voice and a different audio folder.
  */
 const voice = voiceIndex >= 0 ? args[voiceIndex + 1] : 'warm';
+
+/**
+ * Which language these recordings are in.
+ *
+ * BCP 47, and checked against a closed list. An unsupported identifier is
+ * refused rather than passed through: the database would reject it at the
+ * foreign key anyway, but failing here means failing before any upload rather
+ * than halfway through one.
+ */
+const LOCALES = ['en', 'es', 'de', 'fr', 'pt-BR'];
+const localeIndex = args.indexOf('--locale');
+const locale = localeIndex >= 0 ? args[localeIndex + 1] : 'en';
+
+if (!LOCALES.includes(locale)) {
+  console.error(`
+  Unsupported locale "${locale}". Known: ${LOCALES.join(', ')}
+`);
+  process.exit(2);
+}
+
+const VOICES = ['warm', 'clear', 'bright'];
+if (!VOICES.includes(voice)) {
+  console.error(`
+  Unknown voice "${voice}". Known: ${VOICES.join(', ')}
+`);
+  process.exit(2);
+}
 const audioDirIndex = args.indexOf('--audio-dir');
 const audioDir = audioDirIndex >= 0 ? args[audioDirIndex + 1] : null;
 
 const BUCKET = 'intervention-audio';
 
 /** modules/<family>/<key>.m4a  ->  modules/<voice>/<family>/<key>.m4a */
-const renditionPath = (path, voiceId) => path.replace(/^modules\//, `modules/${voiceId}/`);
+const renditionPath = (path, voiceId, localeId) =>
+  path.replace(/^modules\//, `modules/${localeId}/${voiceId}/`);
 
 if (!manifestPath) {
   console.error('usage: node scripts/modules-import.mjs <manifest.json> --audio-dir <dir> [--commit]');
@@ -168,7 +196,7 @@ for (const p of plan) {
   const bytes = readFileSync(p.audio);
   // Renditions are filed by voice, so two recordings of the same module do not
   // collide: modules/<voice>/<family>/<key>.m4a
-  const objectPath = renditionPath(p.path, voice);
+  const objectPath = renditionPath(p.path, voice, locale);
   const response = await fetch(`${url}/storage/v1/object/${BUCKET}/${objectPath}`, {
     method: 'POST',
     headers: {
@@ -241,11 +269,12 @@ const versionRows = imported.map((row) => ({
   storage_path: row.storage_path,
   duration_seconds: row.duration_seconds,
   technique_key: row.technique_key,
+  locale,
   approved_at: row.approved ? row.approved_at : null,
 }));
 
 const versionResult = await rest(
-  '/rest/v1/intervention_module_versions?on_conflict=module_id,version',
+  '/rest/v1/intervention_module_versions?on_conflict=module_id,locale,version',
   {
     method: 'POST',
     headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
@@ -280,7 +309,8 @@ const renditionRows = imported.map((row) => ({
   module_id: row.id,
   version: row.version,
   voice_profile: voice,
-  storage_path: renditionPath(row.storage_path, voice),
+  locale,
+  storage_path: renditionPath(row.storage_path, voice, locale),
   duration_seconds: row.duration_seconds,
   approved: row.approved === true,
   approved_at: row.approved ? row.approved_at : null,
@@ -288,7 +318,7 @@ const renditionRows = imported.map((row) => ({
 }));
 
 const renditionResult = await rest(
-  '/rest/v1/module_renditions?on_conflict=module_id,version,voice_profile',
+  '/rest/v1/module_renditions?on_conflict=module_id,locale,version,voice_profile',
   {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=representation' },

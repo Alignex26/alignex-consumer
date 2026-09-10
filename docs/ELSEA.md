@@ -41,10 +41,10 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 502 passing across 17 suites |
+| Tests | 544 passing across 18 suites |
 | TypeScript | clean |
 | Lint | clean |
-| Migrations | 12 written, **all applied** |
+| Migrations | 14 written, **all applied** |
 | Edge functions | `interpret`, `compose` and `voice-check` deployed and current |
 | Deployment parity | current — marker `d4e73de8`; `compose` and `voice-check` redeployed 2026-09-10 for the ElevenLabs adapter |
 | Audio content | **none exists** |
@@ -310,7 +310,7 @@ over on its own when approved content lands.
 Nothing here invents content. The validator's job is to refuse a manifest that
 would put unapproved or placeholder material in front of a person.
 
-### Database — 12 migrations, all applied
+### Database — 14 migrations, all applied
 
 | Migration | Applied |
 |---|---|
@@ -372,7 +372,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 502 across 17 suites
+### Tests — 544 across 18 suites
 
 | Suite | Covers |
 |---|---|
@@ -959,6 +959,88 @@ monetary cost cannot be computed. Usage quantities — characters, cache
 hit/miss, segment count, model — are recorded regardless. **CURRENT PRICING
 ENTRY REQUIRED.** No price was invented.
 
+## 6i. Multilingual-ready, and a third voice
+
+**MULTILINGUAL-READY, NOT MULTILINGUAL.** The model can hold more than one
+language. **No translated content exists**, none was created, and English is the
+only content-ready locale. A schema that can represent a language is not a
+language the product supports.
+
+### The four things that are not the same thing
+
+    module identity     the intervention concept. One row, forever.
+    localised content   the approved wording in one language, versioned.
+    voice profile       a presentation choice.
+    audio rendition     one recording of one localised version in one voice.
+
+    module + locale + version            = one approved localised script
+    that + voice profile                 = one audio rendition
+
+`intervention_module_versions` already **was** the content artifact — immutable,
+versioned, approvable, withdrawable. It needed a locale, not a competing system
+beside it. That is why no second version model exists.
+
+### Languages
+
+| Locale | Label | Enabled | Content-ready |
+|---|---|---|---|
+| `en` | English | yes | **yes** |
+| `es` | Español | no | no |
+| `de` | Deutsch | no | no |
+| `fr` | Français | no | no |
+| `pt-BR` | Português (Brasil) | no | no |
+
+Two flags, deliberately separate: `is_enabled` is product intention,
+`is_content_ready` is whether a complete approved library actually exists.
+Conflating them is how a language gets offered before it can be delivered. Only
+a content-ready locale can be composed from.
+
+### Voice falls back. Language never does.
+
+A missing rendition in the requested voice resolves to the default voice
+**within the same language**. A missing language resolves to nothing:
+`compose` returns **`locale_unavailable`**, a distinct failure from
+`library_empty`, so the caller learns the language is unavailable rather than
+that ELSEA is broken.
+
+Enforced three ways, because a mixed-language session would be a worse failure
+than no session and nobody would report it as a bug: the locale is resolved
+before any rendition is read; the rendition query filters on it; and the result
+is filtered again in memory so a future refactor of that query cannot break it.
+
+Verified live: `es` returns `locale_unavailable`, not English.
+
+### The third voice
+
+`bright` exists as a product profile and is **not active**. It has no provider
+binding, and a voice offered before it can resolve to audio produces a session
+somebody cannot hear. `warm` and `clear` are unchanged.
+
+Activating it is a **data action, not a migration**: map a provider voice, add
+renditions, then set `is_active`.
+
+### Provider mapping
+
+`provider_voice_mappings` (voice profile × locale × provider) replaces
+`ELEVENLABS_VOICE_ID` as the architecture — a single environment variable can
+bootstrap one voice but cannot express three profiles across five languages.
+**Service-role only, no policy**: a provider's voice id is commercial
+information the client has no reason to hold.
+
+A person's saved preference is an ELSEA profile such as `warm`. The provider is
+resolved server-side, so switching vendor is a data change.
+
+`available_voices` is a readable view exposing labels only — no provider name,
+no voice id. It is currently empty, because nothing is mapped.
+
+### What did not change
+
+Module identity does not fork by language or by voice. Effectiveness is not
+split by either — doing so would fragment a person's history the first time
+they changed one. Recipes, canonical targets, families, duration ceilings and
+the audio production specification are untouched. Fingerprints carry module and
+version, never a voice or a provider.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
@@ -975,9 +1057,10 @@ Stated plainly so none is mistaken for finished work.
 - **Nothing writes `session_costs`.** The manifest link and every column exist;
   the row does not, because there is no generation to cost. Needs a TTS
   provider.
-- **No TTS provider, no dynamic speech.** Deliberately deferred. Sessions bill
-  nothing. `_shared/provider.ts` is the adapter boundary; `speech.ts` holds the
-  budget. Both server-side.
+- **ElevenLabs is wired but has never been called live.** The adapter exists
+  behind the provider boundary and is unit-proven; no real request has been
+  made, because `voice-check` requires the service-role key. No dynamic speech
+  is generated in a session, so sessions still bill nothing. See §6h.
 - **Edge Function typechecking is real but partial.** `npm run
   typecheck:functions` checks the functions' own logic — imports resolve, names
   exist, types line up — using hand-written ambient stubs in

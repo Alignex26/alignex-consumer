@@ -129,7 +129,9 @@ describe('intervention_module_versions is reachable', () => {
   it('treats a re-import of an unchanged version as a duplicate, not an error', () => {
     // The table is append-only. Re-running the importer must be safe, or the
     // dry-run-then-commit workflow breaks on the second use.
-    expect(IMPORTER).toContain('on_conflict=module_id,version');
+    // Gained a locale in the multilingual pass: version numbers run per
+    // language, so Spanish version 1 is not English version 1.
+    expect(IMPORTER).toContain('on_conflict=module_id,locale,version');
     expect(IMPORTER).toContain('resolution=ignore-duplicates');
   });
 

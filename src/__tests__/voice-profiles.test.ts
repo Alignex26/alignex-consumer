@@ -34,10 +34,13 @@ const SCREEN = read('src', 'app', 'audio-preferences.tsx');
 
 const codeOnly = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
-describe('exactly two profiles, warm by default', () => {
-  it('has two', () => {
-    expect(VOICE_PROFILES).toHaveLength(2);
-    expect(VOICE_PROFILES.map((v) => v.id).sort()).toEqual(['clear', 'warm']);
+describe('the product voice profiles, warm by default', () => {
+  it('has three since the multilingual pass — warm, clear and bright', () => {
+    // `bright` was added as a product profile and is NOT active: it has no
+    // provider binding, and a voice offered before it can resolve to audio
+    // produces a session somebody cannot hear. See multilingual-readiness.
+    expect(VOICE_PROFILES).toHaveLength(3);
+    expect(VOICE_PROFILES.map((v) => v.id).sort()).toEqual(['bright', 'clear', 'warm']);
   });
 
   it('defaults to warm', () => {
@@ -210,8 +213,10 @@ describe('ingestion supports both voices', () => {
     expect(IMPORTER).toContain("? args[voiceIndex + 1] : 'warm'");
   });
 
-  it('files by voice so two recordings never collide', () => {
-    expect(IMPORTER).toContain('modules/${voiceId}/');
+  it('files by locale and voice so no two recordings collide', () => {
+    // Gained a locale segment in the multilingual pass: the same module in the
+    // same voice exists once per language.
+    expect(IMPORTER).toContain('modules/${localeId}/${voiceId}/');
   });
 
   it('the prepare command has a folder per voice', () => {
