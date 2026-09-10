@@ -145,6 +145,22 @@ describe('intervention_module_versions is reachable', () => {
     );
   });
 
+  it('writes no rendition for a module with no audio', () => {
+    // A rendition is a recording. One written for audio that does not exist is a
+    // row pointing at nothing, and it makes "which modules have been recorded?"
+    // unanswerable, because every module would appear to have one.
+    expect(IMPORTER).toContain('const recorded = new Set(plan.filter((p) => p.audio)');
+    expect(IMPORTER).toContain('.filter((row) => recorded.has(row.module_key))');
+  });
+
+  it('does not send an empty rendition request', () => {
+    expect(IMPORTER).toContain('renditionRows.length === 0');
+  });
+
+  it('says so rather than reporting silence', () => {
+    expect(IMPORTER).toContain('No renditions written - no audio was supplied.');
+  });
+
   it('carries a version on the module row so history can advance', () => {
     expect(IMPORTER).toContain('version: m.version ?? 1');
   });

@@ -328,19 +328,36 @@ const newVersions = JSON.parse(versionResult.body).length;
 // `approved` is copied from the manifest exactly as given, like everything
 // else. A rendition of approved content is not itself approved until somebody
 // says so.
-const renditionRows = imported.map((row) => ({
-  module_id: row.id,
-  version: row.version,
-  voice_profile: voice,
-  locale,
-  storage_path: renditionPath(row.storage_path, voice, locale),
-  duration_seconds: row.duration_seconds,
-  approved: row.approved === true,
-  approved_at: row.approved ? row.approved_at : null,
-  updated_at: new Date().toISOString(),
-}));
+// ONLY FOR MODULES THAT ACTUALLY HAVE AUDIO.
+//
+// A rendition is a recording. Writing one for a module whose audio does not
+// exist creates a row pointing at nothing — invisible today because it would be
+// unapproved, and a lie in the table regardless. It also makes the useful
+// question "which modules have been recorded?" unanswerable, because every
+// module would appear to have a rendition.
+//
+// So a module imported without audio gets its module row and its immutable
+// version row, and no rendition. The rendition appears when the recording does,
+// written by finalise-master.mjs or by a later import that carries the file.
+const recorded = new Set(plan.filter((p) => p.audio).map((p) => p.key));
 
-const renditionResult = await rest(
+const renditionRows = imported
+  .filter((row) => recorded.has(row.module_key))
+  .map((row) => ({
+    module_id: row.id,
+    version: row.version,
+    voice_profile: voice,
+    locale,
+    storage_path: renditionPath(row.storage_path, voice, locale),
+    duration_seconds: row.duration_seconds,
+    approved: row.approved === true,
+    approved_at: row.approved ? row.approved_at : null,
+    updated_at: new Date().toISOString(),
+  }));
+
+const renditionResult = renditionRows.length === 0
+  ? { ok: true, status: 200, body: '[]' }
+  : await rest(
   '/rest/v1/module_renditions?on_conflict=module_id,locale,version,voice_profile',
   {
     method: 'POST',
@@ -366,5 +383,13 @@ if (!renditionResult.ok) {
 }
 
 console.log(`\n  Uploaded ${uploaded} file(s). Wrote ${rows.length} module row(s).`);
+if (renditionRows.length === 0) {
+  // No audio was supplied, so no recording exists to describe. Said plainly,
+  // because a silent absence here is what created placeholder rows before.
+  console.log('  No renditions written - no audio was supplied.');
+  console.log('  Module and version rows exist; the recordings do not yet.');
+} else {
+  console.log(`  Wrote ${renditionRows.length} ${locale} / ${voice} rendition(s).`);
+}
 console.log(`  Recorded ${newVersions} new version row(s); ${versionRows.length - newVersions} already present.`);
 console.log(`  ${approvedCount} are approved and therefore selectable.\n`);
