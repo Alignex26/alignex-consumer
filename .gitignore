@@ -45,3 +45,8 @@ example
 
 # Test-only placeholder voice. Never committed, never uploaded.
 content/placeholder-audio/
+
+# Raw voice takes and generated masters. Never committed.
+content/nervous_ready/audio-source/*
+!content/nervous_ready/audio-source/README.txt
+content/nervous_ready/masters/
