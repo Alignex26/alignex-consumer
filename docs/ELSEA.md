@@ -41,11 +41,11 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 467 passing across 16 suites |
+| Tests | 502 passing across 17 suites |
 | TypeScript | clean |
 | Lint | clean |
 | Migrations | 12 written, **all applied** |
-| Edge functions | `interpret` and `compose` deployed and current (`npm run deploy:check`) |
+| Edge functions | `interpret`, `compose` and `voice-check` deployed and current |
 | Deployment parity | current — marker `b9d55b12`; `compose` redeployed 2026-09-10 for voice-rendition resolution |
 | Audio content | **none exists** |
 | Blocking | approved intervention content and audio. All 5 recipes specified. |
@@ -372,7 +372,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 467 across 16 suites
+### Tests — 502 across 17 suites
 
 | Suite | Covers |
 |---|---|
@@ -891,6 +891,73 @@ across voices.
 
 **Not proven on device**, like everything downstream of the composer: no
 renditions exist, so nothing has ever resolved one.
+
+## 6h. ElevenLabs, behind the provider boundary
+
+Wired as the first TTS provider. **Not proven live yet** — see below.
+
+| | |
+|---|---|
+| Adapter | `_shared/elevenlabs.ts`, implements the existing `VoiceProvider` |
+| Provider abstraction | **intact** — no parallel system was created |
+| Configuration | `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL_ID`, Edge Function secrets only |
+| Model source | the configured secret; no model id appears in code |
+| Live generation | **NOT RUN** — needs the service-role key |
+| Cache | uses the existing `generated_segments` model; nothing new invented |
+| Storage | private bucket, path derived from the cache key |
+| Budget | unchanged, enforced before any provider call |
+| Cost telemetry | usage quantities recorded; **CURRENT PRICING ENTRY REQUIRED** |
+
+### The boundary held
+
+Everything vendor-specific — endpoint, header, request body, audio format,
+failure mapping — is confined to the adapter. `compose.ts`, `speech.ts`,
+`allocate.ts` and the composer contain no reference to ElevenLabs, asserted by
+test. So does the client bundle.
+
+Configuration comes only from the environment. A model id in code would make
+changing model a code change and would put a vendor's vocabulary into ELSEA's
+domain.
+
+### Raw text still cannot reach a provider
+
+Structurally, not by convention. `SynthesisRequest` has no field for user text
+and the cache key is built entirely from structured state — `speechCacheKey`
+throws on an unsafe context tag rather than sanitising it, so a malformed tag
+fails closed instead of producing a key.
+
+The storage path is derived from that cache key, so nothing typed can reach a
+path either. And **the adapter never reads the provider's error body**: a real
+TTS error can quote the submitted text back, which would put speech content in
+a log by accident. Only the status is used.
+
+### The budget is still the gate
+
+Unchanged: 30s normal, 45s ceiling, checked before a paid call. A test drives
+an over-ceiling verdict and asserts **the provider was never called** — the
+failure mode that matters is an invoice, not an exception.
+
+### The integration check
+
+`functions/voice-check` proves the chain end to end and is deliberately hard to
+abuse: it **takes no input** (the phrase is compiled in), requires the **service
+role key**, writes to a separate `checks/` prefix, and signs for five minutes.
+Verified live: the anon key gets `forbidden`, a GET gets `method_not_allowed`.
+
+It writes no `generated_segments` row. That table is keyed on structured state
+and an engineering phrase has none; inventing a context so a test could be
+cached would put a test string in the cache real sessions read from.
+
+### What is still outstanding
+
+**The one live generation has not run.** It needs the service-role key, which is
+not available in this environment. Everything either side of the call is
+deployed and verified.
+
+**Pricing is unconfigured.** `provider_pricing` has no ElevenLabs row, so
+monetary cost cannot be computed. Usage quantities — characters, cache
+hit/miss, segment count, model — are recorded regardless. **CURRENT PRICING
+ENTRY REQUIRED.** No price was invented.
 
 ## 7. Known gaps
 

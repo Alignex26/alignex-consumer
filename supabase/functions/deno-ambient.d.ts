@@ -52,6 +52,17 @@ declare module 'jsr:@supabase/supabase-js@2' {
   }
 
   interface Bucket {
+    // Added 2026-09-10 for the ElevenLabs integration proof. Hand-written, so
+    // only what the functions actually call is declared.
+    upload(
+      path: string,
+      body: Uint8Array,
+      options?: { contentType?: string; upsert?: boolean }
+    ): Promise<{ data: unknown; error: { message: string } | null }>;
+    createSignedUrl(
+      path: string,
+      expiresIn: number
+    ): Promise<{ data: { signedUrl: string } | null; error: { message: string } | null }>;
     createSignedUrl(path: string, expiresIn: number): Promise<{
       data: { signedUrl: string } | null;
       error: { message: string } | null;

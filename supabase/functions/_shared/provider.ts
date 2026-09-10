@@ -24,8 +24,24 @@ export type VoiceProviderId = string;
 export type SynthesisRequest = {
   text: string;
   voice: string;
-  /** Bounded by the caller before it reaches here. See `budget.ts`. */
+  /** Bounded by the caller before it reaches here. See `speech.ts`. */
   characterCount: number;
+  /**
+   * The deterministic key this speech was derived from.
+   *
+   * Provider-neutral, and safe by construction: `speechCacheKey` builds it
+   * entirely from structured state and throws rather than sanitising an unsafe
+   * context tag. An adapter uses it to name the stored object, which is why
+   * nothing a person typed can reach a storage path.
+   */
+  cacheKey: string;
+  /**
+   * Seconds the budget was enforced against.
+   *
+   * Carried so an adapter can report a duration without decoding audio inside
+   * an Edge Function. The real length is measured where the file can be read.
+   */
+  estimatedSeconds: number;
 };
 
 export type SynthesisResult = {
