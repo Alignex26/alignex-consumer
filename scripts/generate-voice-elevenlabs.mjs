@@ -74,6 +74,48 @@ const MODULES = [
       'Breathe in gently, then let the out-breath be a little longer. ' +
       'Again. In, easy. Out, slower. ' +
       'Let your shoulders soften as you breathe out.',
+    /**
+     * The same approved words, with silence where the breathing happens.
+     *
+     * WHY THIS ONE MODULE HAS IT. Here the breathing IS the technique, and it
+     * is the only script that asks the listener to do something in real time.
+     * Read straight through, the prompts land in about twenty seconds and
+     * nobody has time to follow them — the words would be present and the
+     * intervention absent.
+     *
+     * NOT A WORDING CHANGE. Every approved word survives, in order. A break tag
+     * is a delivery instruction, the spoken equivalent of the direction that
+     * already says "allow enough space for the breathing prompts". The drift
+     * check below strips the tags and compares the words, so this cannot become
+     * a route around approval.
+     *
+     * ELEVENLABS CAPS A SINGLE BREAK AT 3 SECONDS, so longer pauses are several
+     * consecutive tags. That is a provider constraint, not a choice.
+     *
+     * THE DURATIONS ARE ENGINEERING DEFAULTS. Roughly three seconds in and five
+     * out, twice — the shape the pack's estimate assumed. How long a breath
+     * should actually be is a content judgement nobody has made, and these are
+     * a starting point for the first take rather than an answer.
+     */
+    ssml:
+      'Notice where the tension is sitting — your jaw, shoulders, chest or stomach.' +
+      '<break time="1.5s" />' +
+      "You don't have to force it away." +
+      '<break time="2s" />' +
+      // Cycle one: in, then a longer out.
+      'Breathe in gently,' +
+      '<break time="3s" />' +
+      'then let the out-breath be a little longer.' +
+      '<break time="3s" /><break time="2.5s" />' +
+      // Cycle two, cued more briefly because the pattern is established.
+      'Again.' +
+      '<break time="1s" />' +
+      'In, easy.' +
+      '<break time="3s" />' +
+      'Out, slower.' +
+      '<break time="3s" /><break time="2.5s" />' +
+      'Let your shoulders soften as you breathe out.' +
+      '<break time="2s" />',
   },
   {
     key: 'nr_reframe_short',
@@ -121,8 +163,20 @@ if (existsSync(PACK)) {
   const drifted = MODULES.filter((m) => {
     // The pack renders each script as a blockquote; compare on words alone so
     // line breaks and quote markers do not register as differences.
-    const words = m.text.replace(/[—.,?:]/g, ' ').split(/\s+/).filter(Boolean);
-    return !words.every((w) => pack.includes(w));
+    const words = (text) =>
+      text.replace(/<[^>]*>/g, ' ').replace(/[—.,?:]/g, ' ').split(/\s+/).filter(Boolean);
+
+    // Both the plain text and any SSML variant are checked against the pack,
+    // with tags stripped. Markup must not become a way to say something the
+    // approved script does not.
+    if (!words(m.text).every((w) => pack.includes(w))) return true;
+    if (m.ssml && !words(m.ssml).every((w) => pack.includes(w))) return true;
+
+    // And the SSML must speak exactly the approved words, in order — not merely
+    // words that all happen to appear somewhere in the pack.
+    if (m.ssml && words(m.ssml).join(' ') !== words(m.text).join(' ')) return true;
+
+    return false;
   });
 
   if (drifted.length > 0) {
@@ -145,10 +199,27 @@ console.log(`\n  ${commit ? 'GENERATE' : 'DRY RUN'} — ElevenLabs, ${voice} voi
 console.log(`  model     ${model}`);
 console.log(`  voice id  ${voiceId ?? 'NOT SET'}`);
 console.log(`  out       ${OUT}\n`);
-console.log('  module               chars  ceiling');
-console.log('  -------------------  -----  -------');
+/** Total seconds of deliberate silence a module's SSML asks for. */
+const pauseSeconds = (m) =>
+  [...(m.ssml ?? '').matchAll(/<break\s+time="([\d.]+)s"\s*\/>/g)]
+    .reduce((total, match) => total + Number(match[1]), 0);
+
+console.log('  module               chars  pauses  ceiling  headroom');
+console.log('  -------------------  -----  ------  -------  --------');
 for (const m of MODULES) {
-  console.log(`  ${m.key.padEnd(19)}  ${String(m.text.length).padStart(5)}  ${String(m.ceiling).padStart(6)}s`);
+  const pause = pauseSeconds(m);
+  // Rough speaking time at an unhurried 130 words per minute, plus the silence
+  // the SSML asks for. An estimate to catch an obvious overrun before spending
+  // anything -- the real number comes from the file, and the ceiling is
+  // enforced by prepare-voice-masters.mjs regardless.
+  const words = m.text.split(/\s+/).filter(Boolean).length;
+  const estimate = (words / 130) * 60 + pause;
+  const headroom = m.ceiling - estimate;
+  console.log(
+    `  ${m.key.padEnd(19)}  ${String(m.text.length).padStart(5)}  ` +
+    `${(pause ? `${pause}s` : '—').padStart(6)}  ${String(m.ceiling).padStart(6)}s  ` +
+    `${headroom >= 0 ? `${headroom.toFixed(1)}s` : `OVER ${Math.abs(headroom).toFixed(1)}s`}`
+  );
 }
 console.log(`\n  ${characters} characters total across ${MODULES.length} modules.`);
 
@@ -199,7 +270,8 @@ for (const m of MODULES) {
           Accept: 'audio/mpeg',
         },
         body: JSON.stringify({
-          text: m.text,
+          // SSML where a module has it; the plain approved text otherwise.
+          text: m.ssml ?? m.text,
           model_id: model,
           // Left at the provider's defaults on purpose. Stability, similarity
           // and style are delivery decisions, and delivery is a content call.
