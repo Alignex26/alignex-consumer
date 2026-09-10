@@ -67,7 +67,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `d18f033` |
+| Tip | `923fa02` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 15 migrations applied |
@@ -1157,7 +1157,7 @@ Step 2 writes module rows and version rows carrying the approved scripts, and
 keeps "which modules have been recorded?" answerable, which placeholder rows
 would have destroyed.
 
-| 3 | Map three ElevenLabs voices in `provider_voice_mappings` | **a casting decision** | `no_provider_mapping` |
+| 3 | ~~Map three ElevenLabs voices~~ **decided 2026-09-10; write unconfirmed** — §6l | — | — |
 | 4 | Generate one master | steps 1–3 | — |
 | 5 | Finalise: convert, measure, publish unapproved | ffmpeg locally | — |
 | 6 | Listen, then approve the rendition | a human | rendition never plays |
@@ -1225,6 +1225,59 @@ Run the read-only block against the live database with the key set, and check:
 five module keys with `approved false` / `is_active true`; five `en` versions
 with `approved_at` set and `withdrawn_at` null; `script_chars` of
 190 / 248 / 335 / 381 / 99; zero renditions; zero provider mappings.
+
+## 6l. Voice casting — decided, mapping pending confirmation
+
+**The casting decision was made by the product owner on 2026-09-10.** Three
+ElevenLabs voices were chosen and supplied for `warm`, `clear` and `bright`, all
+`locale = en`, `provider = elevenlabs`.
+
+### The voice ids are deliberately not in this repository
+
+They were supplied for direct insertion into `provider_voice_mappings` and are
+**not recorded here, not in a migration, and not in any committed file**. A
+migration would have been the obvious place and would have put them in source
+control, which is the one thing the instruction ruled out. They live in the
+database and nowhere else.
+
+They are provider identifiers rather than API secrets, but the reasoning that
+made the mapping table service-role only applies to them too: publishing which
+vendor ELSEA uses and which of their voices is commercial information with no
+product reason to be public.
+
+### What was done, and what was not
+
+An operator PowerShell block was written to upsert the three rows against the
+applied schema — `voice_profile`, `locale`, `provider`, `provider_voice_id`,
+`is_active`, with the composite primary key `(voice_profile, locale, provider)`
+as the conflict target, so a re-run updates rather than duplicating.
+
+**Execution is unconfirmed.** The service-role key is deliberately absent from
+the assistant's environment, so the write could not be performed or verified
+here. As with §6k, this is recorded as decided-and-issued rather than done.
+
+### `bright` is mapped and still not selectable
+
+This is the intended behaviour and it needed no change. `available_voices`
+requires the profile to be `is_active`, and `bright` is `false` until a
+recording exists. **A provider mapping alone does not make a voice offerable** —
+mapping says a vendor voice can render it; `is_active` says a person may choose
+it. Nothing in the block touches `voice_profiles.is_active`.
+
+Activating it later remains a data action:
+
+```sql
+update voice_profiles set is_active = true where id = 'bright';
+```
+
+after renditions exist and have been approved.
+
+### Unchanged by this step
+
+No renditions created. No audio generated. No ElevenLabs call made. No content
+approved or activated. `ELEVENLABS_API_KEY` and `ELEVENLABS_MODEL_ID` untouched.
+Nothing added to `user_preferences`, which holds an ELSEA profile and never a
+provider identity.
 
 ## 7. Known gaps
 
