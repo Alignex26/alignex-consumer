@@ -46,7 +46,7 @@ Last updated: 2026-09-09.
 | Lint | clean |
 | Migrations | 12 written, **all applied** |
 | Edge functions | `interpret` and `compose` deployed and current (`npm run deploy:check`) |
-| Deployment parity | current — marker `1cfe45f`; every commit since is documentation, and no function *source* has changed (only the marker file itself, which the check excludes) |
+| Deployment parity | current — marker `b9d55b12`; `compose` redeployed 2026-09-10 for voice-rendition resolution |
 | Audio content | **none exists** |
 | Blocking | approved intervention content and audio. All 5 recipes specified. |
 
@@ -65,7 +65,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `eb36be1` |
+| Tip | `c314d77` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 12 migrations applied |
