@@ -41,7 +41,7 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 582 passing across 19 suites |
+| Tests | 585 passing across 19 suites |
 | TypeScript | clean |
 | Lint | clean |
 | Migrations | 15 written, **all applied** |
@@ -67,7 +67,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `c722220` |
+| Tip | `6096fc8` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 12 migrations applied |
@@ -374,7 +374,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 582 across 19 suites
+### Tests — 585 across 19 suites
 
 | Suite | Covers |
 |---|---|
@@ -1137,6 +1137,12 @@ natural first step and would fail immediately.
 |---:|---|---|---|
 | 1 | ~~Load the scripts into `script_text`~~ **done** | — | — |
 | 2 | Import the five modules and their `en` version rows | a service-role key | `unknown_module` |
+
+Step 2 writes module rows and version rows carrying the approved scripts, and
+**no renditions** — a rendition is a recording, and none exists yet. That also
+keeps "which modules have been recorded?" answerable, which placeholder rows
+would have destroyed.
+
 | 3 | Map three ElevenLabs voices in `provider_voice_mappings` | **a casting decision** | `no_provider_mapping` |
 | 4 | Generate one master | steps 1–3 | — |
 | 5 | Finalise: convert, measure, publish unapproved | ffmpeg locally | — |
