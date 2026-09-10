@@ -41,11 +41,11 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 544 passing across 18 suites |
+| Tests | 582 passing across 19 suites |
 | TypeScript | clean |
 | Lint | clean |
-| Migrations | 14 written, **all applied** |
-| Edge functions | `interpret`, `compose` and `voice-check` deployed and current |
+| Migrations | 15 written, **all applied** |
+| Edge functions | `interpret`, `compose`, `voice-check`, `generate-master` deployed and current |
 | Deployment parity | current — marker `e4cabefa`; `compose` and `voice-check` redeployed 2026-09-10 for locale-aware resolution |
 | Audio content | **none exists** |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content exists** |
@@ -312,7 +312,7 @@ over on its own when approved content lands.
 Nothing here invents content. The validator's job is to refuse a manifest that
 would put unapproved or placeholder material in front of a person.
 
-### Database — 14 migrations, all applied
+### Database — 15 migrations, all applied
 
 | Migration | Applied |
 |---|---|
@@ -374,7 +374,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 544 across 18 suites
+### Tests — 582 across 19 suites
 
 | Suite | Covers |
 |---|---|
@@ -1042,6 +1042,98 @@ split by either — doing so would fragment a person's history the first time
 they changed one. Recipes, canonical targets, families, duration ceilings and
 the audio production specification are untouched. Fingerprints carry module and
 version, never a voice or a provider.
+
+## 6j. Master generation — the operator path
+
+Producing a reusable intervention master from approved content, with the
+ElevenLabs key never leaving Supabase. **No master has been generated.**
+
+### It is two halves, and the split is where the constraint is
+
+`functions/generate-master` holds the provider key and produces raw audio into
+`staging/`. `scripts/finalise-master.mjs` converts it to specification, measures
+it and writes the rendition.
+
+The split is not a preference. Meeting the audio specification means measuring
+and re-encoding, which means **ffmpeg — which cannot run in a Deno Edge
+Function.** So each half does the part only it can: the function does what
+requires the key, the script does what requires ffmpeg. **The finalise step
+needs no ElevenLabs key**, which is the property that motivated building this.
+
+The alternative was storing an unconverted MP3 and calling it a master. It
+would have failed the validator later, or passed on a machine without ffmpeg
+and shipped.
+
+### Arbitrary text cannot be spoken
+
+The request carries **identifiers only** — module key, locale, voice profile,
+optional version. There is no `text` parameter and nowhere to put one. The
+server fetches the approved wording from the database.
+
+> **A gap this exposed.** The approved wording was not stored anywhere — it
+> existed only in a markdown pack. Survivable while a person reads from the
+> pack; not survivable once a server generates the audio, because an endpoint
+> that accepts text and speaks it can say anything.
+> `intervention_module_versions.script_text` now holds it, on the row that
+> already carried every other fact about approved localised content. Nullable
+> rather than backfilled, because inventing approved content is the one thing
+> that must not happen.
+
+### Everything fails closed
+
+Unknown or inactive module · unknown, withdrawn or unapproved version · locale
+mismatch · locale not content-ready · unknown or inactive voice profile ·
+**missing provider mapping**. An unmapped voice is never rendered in another
+one — there is no fallback voice list in this function at all.
+
+Approval is checked **before** the provider is reached, and again by the
+finalise step, because content can be withdrawn between rendering and
+publishing.
+
+### Voice resolution
+
+The operator names an ELSEA profile — `warm`, `clear`, `bright`. A provider
+voice id is never sent in a request, never copied into a command, and never
+returned. `provider_voice_mappings` resolves it server-side.
+`ELEVENLABS_VOICE_ID` remains only the bootstrap setting for `voice-check`.
+
+### Synthesis is not approval
+
+The function writes **no rendition**. The finalise step writes one with
+`approved = false` and says so out loud. A successful render is not a decision
+that the recording is good enough for somebody to hear.
+
+### Not session TTS
+
+A master is produced once and reused by everyone. It writes no
+`generated_segments` row, attaches to no user or session, and **does not touch
+the 30s/45s dynamic budget** — that governs speech generated *during* a
+session. The dynamic path is untouched.
+
+### The operator workflow
+
+One module, one locale, one voice. Bulk generation is deliberately not offered:
+it is much easier to spend money by accident with a loop.
+
+```bash
+# 1. render  (key stays in Supabase)
+curl -X POST "$SUPABASE_URL/functions/v1/generate-master"   -H "Authorization: Bearer $SERVICE_ROLE_KEY"   -H "Content-Type: application/json"   -d '{"module_key":"nr_arrive_short","locale":"en","voice_profile":"warm"}'
+
+# 2. convert, measure, publish  (needs ffmpeg, not the provider key)
+SUPABASE_SERVICE_ROLE_KEY=... node scripts/finalise-master.mjs   --module nr_arrive_short --locale en --voice warm --commit
+
+# 3. listen, then approve the rendition by hand
+```
+
+Verified live: the anon key gets `forbidden`, a GET gets
+`method_not_allowed`.
+
+### Status
+
+**No masters generated. No provider called.** The path is deployed and
+unit-proven, and blocked on one thing: **no provider voice mappings exist**, so
+every generation would fail `no_provider_mapping`. Choosing the three ElevenLabs
+voices is a casting decision.
 
 ## 7. Known gaps
 
