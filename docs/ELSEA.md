@@ -41,7 +41,7 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 585 passing across 19 suites |
+| Tests | 610 passing across 20 suites |
 | TypeScript | clean |
 | Lint | clean |
 | Migrations | 15 written, **all applied** |
@@ -67,7 +67,7 @@ branches, local or remote.
 | | |
 |---|---|
 | Branch | `main`, pushed, matches `origin/main` |
-| Tip | `923fa02` |
+| Tip | `pending` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
 | Database | all 15 migrations applied |
@@ -378,7 +378,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 585 across 19 suites
+### Tests — 610 across 20 suites
 
 | Suite | Covers |
 |---|---|
@@ -1278,6 +1278,68 @@ No renditions created. No audio generated. No ElevenLabs call made. No content
 approved or activated. `ELEVENLABS_API_KEY` and `ELEVENLABS_MODEL_ID` untouched.
 Nothing added to `user_preferences`, which holds an ELSEA profile and never a
 provider identity.
+
+## 6m. Operator auth — a defect found in production, and fixed
+
+`generate-master` returned **403 to a correctly signed service_role JWT**. The
+gateway had already accepted the token; the function then rejected it itself.
+
+### Root cause
+
+```ts
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+if (auth !== `Bearer ${SERVICE_ROLE_KEY}`) → 403
+```
+
+A **raw string comparison against an environment variable**. It assumes the
+token a caller holds is byte-identical to whatever Supabase injects there —
+which is not guaranteed, varies with how a project's keys were generated, and
+breaks silently when it changes.
+
+Authorisation is a question about **identity**, not about string equality with
+a secret. This was my design error, and it was the wrong mechanism from the
+start rather than a mechanism that drifted.
+
+### How it was localised
+
+The gateway and the function fail differently, which made it a two-request
+diagnosis: a garbage token returns **401 `UNAUTHORIZED_INVALID_JWT_FORMAT`**
+from the gateway, while the anon key returns **403 `{"failure":"forbidden"}`**
+from our code. A 403 therefore proved the token had passed signature
+verification and our own check had refused it.
+
+### The fix
+
+`_shared/operator-auth.ts` reads the verified JWT's `role` claim and requires
+exactly `service_role`. Anon, authenticated, a missing role, a non-string role,
+a malformed payload, a non-Bearer scheme and a missing header all fail closed.
+
+No secret is compared, so none can be timing-leaked or logged by this path.
+
+> **The invariant this rests on.** Reading a claim is safe only because the
+> gateway verifies the signature first. Both operator functions have no
+> `[functions.*]` block, so `verify_jwt` defaults to true. **`interpret` is
+> explicitly `verify_jwt = false` and must never adopt this helper** — there, a
+> hand-crafted token claiming `service_role` would be believed. Stated in the
+> helper's own header and asserted by test.
+
+### Verified live after redeploy
+
+| Request | Result |
+|---|---|
+| No header | `401 UNAUTHORIZED_NO_AUTH_HEADER` (gateway) |
+| Garbage token | `401 UNAUTHORIZED_INVALID_JWT_FORMAT` (gateway) |
+| Anon token → `generate-master` | **403 forbidden** |
+| Anon token → `voice-check` | **403 forbidden** |
+| `compose` | unaffected, `library_empty` |
+
+**No ElevenLabs call was made.** Every probe stops at the auth check.
+
+### Four obsolete tests
+
+Four assertions across two suites were asserting the *defective* mechanism —
+they had locked the bug in rather than catching it. Updated to assert the
+claim check. A test that pins an implementation detail will happily pin a bug.
 
 ## 7. Known gaps
 

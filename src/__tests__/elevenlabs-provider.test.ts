@@ -330,8 +330,15 @@ describe('the integration check cannot be abused', () => {
   });
 
   it('requires the service role key, not the anon key', () => {
-    expect(CHECK_FN).toContain('auth !== `Bearer ${SERVICE_ROLE_KEY}`');
-    expect(CHECK_FN).toContain('"forbidden"');
+    // Was a raw comparison against SUPABASE_SERVICE_ROLE_KEY, which rejected a
+    // correctly signed service_role token in production. Now authorises on the
+    // verified JWT role claim -- see operator-auth.test.ts.
+    expect(CHECK_FN).toContain('if (!isOperator(req)) return forbidden();');
+    expect(CHECK_FN).toContain('operator-auth.ts');
+    // The refusal itself now lives in the shared helper, which returns the
+    // same 403 body. Asserted there; here what matters is that the function
+    // calls it.
+    expect(CHECK_FN).toContain('return forbidden();');
   });
 
   it('writes nothing to the production speech cache', () => {

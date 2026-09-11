@@ -191,8 +191,15 @@ describe('synthesis is not approval', () => {
 
 describe('the operator path is hard to misuse', () => {
   it('is service-role only', () => {
-    expect(GENERATOR).toContain('auth !== `Bearer ${SERVICE_ROLE_KEY}`');
-    expect(GENERATOR).toContain('"forbidden"');
+    // Was a raw comparison against SUPABASE_SERVICE_ROLE_KEY, which rejected a
+    // correctly signed service_role token in production. Now authorises on the
+    // verified JWT role claim -- see operator-auth.test.ts.
+    expect(GENERATOR).toContain('if (!isOperator(req)) return forbidden();');
+    expect(GENERATOR).toContain('operator-auth.ts');
+    // The refusal itself now lives in the shared helper, which returns the
+    // same 403 body. Asserted there; here what matters is that the function
+    // calls it.
+    expect(GENERATOR).toContain('return forbidden();');
   });
 
   it('does one module, one locale, one voice', () => {

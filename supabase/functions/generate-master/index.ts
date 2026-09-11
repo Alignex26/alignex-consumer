@@ -37,6 +37,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 import { createElevenLabsProvider, SynthesisError } from "../_shared/elevenlabs.ts";
+import { forbidden, isOperator } from "../_shared/operator-auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -56,10 +57,14 @@ const fail = (failure: string, detail?: Record<string, unknown>) =>
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return fail("method_not_allowed");
 
-  // OPERATOR ONLY. The public anon key is refused outright, so nobody holding
-  // the key from the app bundle can reach a paid provider through this.
-  const auth = req.headers.get("Authorization") ?? "";
-  if (auth !== `Bearer ${SERVICE_ROLE_KEY}`) return json({ ok: false, failure: "forbidden" }, 403);
+  // OPERATOR ONLY, by verified JWT claim rather than by string equality with a
+  // secret. The gateway has already checked the signature (this function has no
+  // `[functions.*]` block, so `verify_jwt` defaults to true), which is what
+  // makes reading the claim safe. See `_shared/operator-auth.ts`.
+  //
+  // Anon and authenticated users carry their own roles and are refused, so
+  // nobody holding the key from the app bundle can reach a paid provider here.
+  if (!isOperator(req)) return forbidden();
 
   let body: {
     module_key?: unknown;

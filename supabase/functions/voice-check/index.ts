@@ -25,6 +25,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 import { createElevenLabsProvider, SynthesisError } from "../_shared/elevenlabs.ts";
+import { forbidden, isOperator } from "../_shared/operator-auth.ts";
 import { DynamicBudget, estimateSpeechSeconds } from "../_shared/speech.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -51,11 +52,10 @@ function json(body: unknown, status = 200): Response {
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ ok: false, failure: "method_not_allowed" }, 405);
 
-  // Service role only. Not callable with the key that ships in the app.
-  const auth = req.headers.get("Authorization") ?? "";
-  if (auth !== `Bearer ${SERVICE_ROLE_KEY}`) {
-    return json({ ok: false, failure: "forbidden" }, 403);
-  }
+  // Service role only, by verified JWT claim. Not callable with the key that
+  // ships in the app. Same mechanism and same invariant as `generate-master`:
+  // safe because the gateway verifies the signature first.
+  if (!isOperator(req)) return forbidden();
 
   const estimatedSeconds = estimateSpeechSeconds(PHRASE);
 
