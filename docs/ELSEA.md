@@ -41,10 +41,10 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 632 passing across 21 suites |
+| Tests | 647 passing across 22 suites |
 | TypeScript | clean |
 | Lint | clean |
-| Migrations | 15 written, **all applied** |
+| Migrations | 16 written, **all applied** |
 | Edge functions | `interpret`, `compose`, `voice-check`, `generate-master` deployed and current |
 | Deployment parity | current — marker `14b7dc42`; `generate-master` deployed 2026-09-10 |
 | Audio content | **none exists** |
@@ -70,7 +70,7 @@ branches, local or remote.
 | Tip | `f49660a` |
 | Other branches | none — `elsea-v1-completion` and `elsea-content-pipeline` were merged and deleted |
 | Deployed functions | current with `main`, verified by `npm run deploy:check` |
-| Database | all 15 migrations applied |
+| Database | all 16 migrations applied |
 
 The repository, the database and the deployed functions are in agreement for
 the first time since the completion pass. An earlier version of this section
@@ -313,7 +313,7 @@ over on its own when approved content lands.
 Nothing here invents content. The validator's job is to refuse a manifest that
 would put unapproved or placeholder material in front of a person.
 
-### Database — 15 migrations, all applied
+### Database — 16 migrations, all applied
 
 | Migration | Applied |
 |---|---|
@@ -332,6 +332,7 @@ would put unapproved or placeholder material in front of a person.
 | `20260910140000_locales_and_provider_voices` | yes |
 | `20260910150000_bright_inactive_until_mapped` | yes |
 | `20260910170000_approved_script_text` | yes |
+| `20260911100000_permit_content_approval` | yes |
 
 Catalogue era: `transitions`, `sessions_catalogue`, `session_segments`,
 `safety_events`, `user_sessions`, `session_outcomes`.
@@ -378,7 +379,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 632 across 21 suites
+### Tests — 647 across 22 suites
 
 | Suite | Covers |
 |---|---|
@@ -1394,6 +1395,50 @@ They carry `approved_at = null`. The importer is idempotent — module key and
 `(module_id, locale, version)` are unique, so a re-run updates in place — so
 re-running it with the corrected manifest fixes them. **Nothing becomes
 playable**: `approved` stays false on every module and no rendition exists.
+
+## 6o. Why the second import changed nothing
+
+It reported *"Recorded 0 new version row(s); 5 already present"* and the five
+English rows kept `approved_at = null`. **Two separate things** caused that, and
+fixing either alone would not have worked.
+
+**1. The importer skipped them.** Version rows were written with
+`Prefer: resolution=ignore-duplicates`, which was right while the table was
+purely append-only — re-importing an unchanged version must not error — but it
+means an existing row is not written at all. Approval could never be recorded
+onto one.
+
+**2. The trigger would have refused anyway.** `intervention_module_versions`
+rejects every UPDATE except a withdrawal. So switching to `merge-duplicates`
+alone would have produced an exception rather than an update.
+
+### Approving is not mutating
+
+The module, the version number, the locale, the wording, the technique, the
+path and the duration are all identical before and after. Only the record of a
+human decision is added — the same category as withdrawal, which the trigger has
+always permitted for the same reason.
+
+The exception is narrow on purpose: `approved_at` **null → non-null only** (no
+un-approving, no re-approving), the version must **not be withdrawn**, and every
+substantive field must be unchanged.
+
+That field set now includes **`locale` and `script_text`**, which were added
+after the original trigger was written and were therefore **not being compared
+at all** — a withdrawal could have silently carried different wording with it.
+This tightens the guard while admitting one case.
+
+### The reporting was true and useless
+
+*"Recorded 0 new version row(s)"* looked like success while nothing had been
+updated. It now reports how many rows carry content approval, which is the
+question actually being asked.
+
+### Still unchanged
+
+No module became playable. No rendition was created or approved. No audio, no
+ElevenLabs call. The scripts are byte-identical — asserted by character count
+against the figures verified by SHA-256 before the first import.
 
 ## 7. Known gaps
 

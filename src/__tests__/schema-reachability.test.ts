@@ -132,7 +132,11 @@ describe('intervention_module_versions is reachable', () => {
     // Gained a locale in the multilingual pass: version numbers run per
     // language, so Spanish version 1 is not English version 1.
     expect(IMPORTER).toContain('on_conflict=module_id,locale,version');
-    expect(IMPORTER).toContain('resolution=ignore-duplicates');
+    // Was ignore-duplicates, which skipped an existing row entirely and so
+    // could never record content approval onto one. Now merges -- safe because
+    // the append-only trigger still refuses any real mutation. See
+    // version-approval.test.ts.
+    expect(IMPORTER).toContain('resolution=merge-duplicates');
   });
 
   it('fails loudly if the history cannot be written', () => {

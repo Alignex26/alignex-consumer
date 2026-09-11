@@ -309,7 +309,20 @@ const versionResult = await rest(
   '/rest/v1/intervention_module_versions?on_conflict=module_id,locale,version',
   {
     method: 'POST',
-    headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+    // MERGE, not ignore.
+    //
+    // `ignore-duplicates` was right while these rows were purely append-only:
+    // re-importing an unchanged version must not error. But it meant an
+    // existing row was SKIPPED entirely, so content approval could never be
+    // recorded onto one that already existed -- which is exactly what happened
+    // to the five English rows.
+    //
+    // Merging is safe because the database still refuses a real mutation. The
+    // append-only trigger permits only two transitions on an existing row,
+    // withdrawal and a first content approval, and rejects anything that
+    // changes the wording, the locale, the technique or the version. So this
+    // can record an approval and cannot rewrite content.
+    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
     body: JSON.stringify(versionRows),
   }
 );
@@ -325,7 +338,9 @@ if (!versionResult.ok) {
   process.exit(1);
 }
 
-const newVersions = JSON.parse(versionResult.body).length;
+const returnedVersions = JSON.parse(versionResult.body);
+const newVersions = returnedVersions.length;
+const approvedVersions = returnedVersions.filter((r) => r.approved_at).length;
 
 // --- renditions ------------------------------------------------------------
 //
@@ -406,5 +421,5 @@ if (renditionRows.length === 0) {
 } else {
   console.log(`  Wrote ${renditionRows.length} ${locale} / ${voice} rendition(s).`);
 }
-console.log(`  Recorded ${newVersions} new version row(s); ${versionRows.length - newVersions} already present.`);
+console.log(`  Wrote ${newVersions} version row(s); ${approvedVersions} carry content approval.`);
 console.log(`  ${approvedCount} are approved and therefore selectable.\n`);
