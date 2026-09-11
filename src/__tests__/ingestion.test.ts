@@ -31,6 +31,9 @@ const valid = (over: Record<string, unknown> = {}) => ({
   // what a server speaks, and a version with no script cannot be generated
   // from. A stand-in here, like technique_key above.
   script_text: 'A structurally valid stand-in. Not content.',
+  // Content approval is a different fact from playability, and both are
+  // required explicitly. See approval-separation.test.ts.
+  content_approved: false,
   requires_headphones: false,
   is_bed: false,
   approved: false,

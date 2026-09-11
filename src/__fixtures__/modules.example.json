@@ -9,6 +9,7 @@
     "requires_headphones": false,
     "is_bed": false,
     "approved": false,
-    "script_text": "CONTENT_AUTHORING_REQUIRED"
+    "script_text": "CONTENT_AUTHORING_REQUIRED",
+    "content_approved": false
   }
 ]

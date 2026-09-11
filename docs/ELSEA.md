@@ -41,7 +41,7 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 610 passing across 20 suites |
+| Tests | 632 passing across 21 suites |
 | TypeScript | clean |
 | Lint | clean |
 | Migrations | 15 written, **all applied** |
@@ -378,7 +378,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 610 across 20 suites
+### Tests — 632 across 21 suites
 
 | Suite | Covers |
 |---|---|
@@ -1340,6 +1340,60 @@ No secret is compared, so none can be timing-leaked or logged by this path.
 Four assertions across two suites were asserting the *defective* mechanism —
 they had locked the bug in rather than catching it. Updated to assert the
 claim check. A test that pins an implementation detail will happily pin a bug.
+
+## 6n. Three approvals, and why they were collapsed
+
+The first real `generate-master` request got past auth and returned
+**`content_not_approved`** for wording that had been approved on 2026-09-09.
+
+### The gate was right. What it read had been erased.
+
+`generate-master` checks the **version** row, which is correct:
+
+```ts
+if (version.approved_at === null) return fail("content_not_approved");
+```
+
+The defect was upstream, in the importer:
+
+```js
+approved_at: row.approved ? row.approved_at : null   // modules-import.mjs
+```
+
+That derives the **content version's** approval from the **module's playability
+flag**. A module correctly stays unplayable until approved audio exists, so this
+wrote `approved_at = null` onto content that was approved — and generation then
+refused to speak it.
+
+### The three states, kept apart
+
+| State | Means | Where it lives |
+|---|---|---|
+| **Content version approved** | the wording may be spoken by a provider | `intervention_module_versions.approved_at` |
+| **Audio rendition approved** | this take has been listened to | `module_renditions.approved` |
+| **Module playable** | may enter real sessions | `intervention_modules.approved` |
+
+Master generation requires the **first** and must not require the third — the
+third cannot legitimately be true until a master has been generated and
+approved, so demanding it would demand the output of the step generation is the
+input to.
+
+The manifest now carries `content_approved` and `approved` as separate fields.
+The validator requires both explicitly and **refuses playable-with-unapproved-
+wording**, which is incoherent and dangerous in that direction specifically.
+
+### A second instance, fixed at the same time
+
+Rendition rows had the same derivation. There the right answer is stricter: **an
+import cannot approve a recording, only somebody listening can.** Renditions are
+now written `approved: false` unconditionally, matching `finalise-master.mjs`.
+
+### The already-imported rows need a re-import
+
+They carry `approved_at = null`. The importer is idempotent — module key and
+`(module_id, locale, version)` are unique, so a re-run updates in place — so
+re-running it with the corrected manifest fixes them. **Nothing becomes
+playable**: `approved` stays false on every module and no rendition exists.
 
 ## 7. Known gaps
 

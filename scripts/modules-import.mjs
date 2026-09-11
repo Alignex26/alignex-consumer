@@ -267,6 +267,7 @@ const imported = JSON.parse(result.body);
 // and `intervention_modules` does not carry it. Matched by module_key so a
 // reordered response cannot pair a script with the wrong module.
 const scriptFor = new Map(modules.map((m) => [m.module_key, m.script_text]));
+const contentApprovedFor = new Map(modules.map((m) => [m.module_key, m.content_approved === true]));
 
 const versionRows = imported.map((row) => ({
   module_id: row.id,
@@ -279,7 +280,15 @@ const versionRows = imported.map((row) => ({
   // it must be the approved text and nothing else. The validator has already
   // refused a manifest without it.
   script_text: scriptFor.get(row.module_key) ?? null,
-  approved_at: row.approved ? row.approved_at : null,
+  // CONTENT approval, not playback approval.
+  //
+  // This previously read `row.approved ? ... : null` -- deriving the wording's
+  // approval from the module's playability flag. Since a module correctly stays
+  // unplayable until approved audio exists, that wrote null onto content that
+  // WAS approved, and master generation then refused to speak it.
+  //
+  // The two are different facts and now come from different fields.
+  approved_at: contentApprovedFor.get(row.module_key) ? new Date().toISOString() : null,
 }));
 
 const missingScript = versionRows.filter((r) => !r.script_text);
@@ -350,8 +359,14 @@ const renditionRows = imported
     locale,
     storage_path: renditionPath(row.storage_path, voice, locale),
     duration_seconds: row.duration_seconds,
-    approved: row.approved === true,
-    approved_at: row.approved ? row.approved_at : null,
+    // A RENDITION IS APPROVED BY SOMEBODY LISTENING TO IT, and an import is
+    // not listening. This previously derived from the module's playability
+    // flag, which is a different fact about a different thing.
+    //
+    // Always false, matching finalise-master.mjs. Approving a recording is a
+    // deliberate human act afterwards.
+    approved: false,
+    approved_at: null,
     updated_at: new Date().toISOString(),
   }));
 

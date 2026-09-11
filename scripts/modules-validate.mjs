@@ -187,6 +187,27 @@ for (const [index, m] of modules.entries()) {
     fail(key, 'approved must be explicitly true or false');
   }
 
+  // Content approval — SEPARATE FROM PLAYBACK APPROVAL.
+  //
+  // `content_approved` says the WORDING is approved and may be spoken by a voice
+  // provider. `approved` says the module may be PLAYED to somebody, which
+  // additionally requires an approved recording to exist.
+  //
+  // They were conflated once and it cost a production failure: the importer
+  // derived the content version's approval from the module's playability flag,
+  // so correctly-approved wording was written with `approved_at = null` and
+  // master generation refused it as unapproved content.
+  if (typeof m.content_approved !== 'boolean') {
+    fail(key, 'content_approved must be explicitly true or false — it is not the same as approved');
+  }
+
+  // Playable but the wording is not approved is incoherent, and dangerous in
+  // that direction specifically: it would put unapproved words in front of
+  // somebody.
+  if (m.approved === true && m.content_approved === false) {
+    fail(key, 'approved (playable) cannot be true while content_approved is false');
+  }
+
   // Script — the approved localised wording.
   //
   // Required, because it is what a server-side generator will speak. Without it
