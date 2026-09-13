@@ -1899,6 +1899,85 @@ The finalise step runs the same mastering pipeline as production (§6p), so the
 paced take is held to the same specification: <= 21s, AAC-LC 44.1 kHz mono,
 -16 LUFS +/-1, true peak <= -1 dBTP.
 
+## 6s. Commercial architecture — entitlements, ten voices, coverage
+
+The first pass of the commercial completion programme. What it did NOT do is in
+`ELSEA-COMMERCIAL-READINESS.md`, which is written to be trusted rather than
+encouraging.
+
+### The three decisions that had blocked entitlement are made
+
+`src/lib/entitlement.ts` had carried three "PRODUCT DECISION REQUIRED" markers
+since it was written, and answered "yes, always" rather than invent them:
+
+```
+free      3 complete sessions, LIFETIME, per account
+monthly   USD 9.99
+annual    USD 49.99   (primary)
+paid      unlimited legitimate use
+```
+
+Two tables and two `security definer` RPCs now hold it, in migration
+`20260913100000_entitlements_and_free_sessions.sql`:
+
+- **`entitlements`** — one row per person, store-agnostic (`entitlement =
+  'premium'`, never a store product id). Five states, all of which the customer
+  would recognise: `active`, `grace`, `billing_issue`, `cancelled`, `expired`.
+  Grace, billing issue and cancellation all **retain** access — somebody who
+  cancels on day two of an annual subscription has paid for the year.
+- **`free_session_ledger`** — append-only, `run_id` unique, keyed to
+  `auth.users`. A reinstall does not reset it and a repeated report is a no-op
+  rather than a second charge.
+
+Read your own; write neither. Both tables are service-role write only, because a
+client that could insert into either could grant itself the product.
+
+**The counting point.** An allowance is consumed when a run is marked completed,
+verified against `user_sessions` rather than believed from the caller. Nothing
+consumes an allowance for a safety diversion, `locale_unavailable`,
+`library_empty`, or any backend or provider failure — none of those reaches a
+completed run. Charging a third of somebody's trial for an outage produces refund
+requests, and deserves to.
+
+**No price appears in app code**, and a test enforces it against code rather than
+comments. Displayed prices come from the store, localised, at runtime.
+
+**Open, and recorded rather than decided:** the trial is per *account*, and
+accounts need an email OTP. Somebody who never signs in has no server-side
+identity, so either the trial requires an account up front or it is device-local
+and resettable. That is a UX decision.
+
+### Ten voice profiles
+
+`20260913110000_ten_voice_profiles.sql` adds `descriptor` and `sort_order`, and
+seeds all ten: warm, clear, bright, grounded, gentle, direct, calm, confident,
+soft, deep.
+
+Seven have **no provider mapping and `is_active = false`**. No provider voice id
+was invented; selecting those seven is a product decision. A trigger now refuses
+to activate any profile without an active mapping — the same mistake was made
+once before, when `bright` was inserted active before a mapping existed.
+
+The trigger polices the **transition** into active rather than the state.
+Provider mappings are operator data, not seeded data, so on a fresh database none
+exist while `warm` is already active; a rule written against the state would make
+every later edit to that row fail.
+
+### Coverage reporting
+
+`npm run coverage` — read-only, service-role, reports the locale x voice x module
+matrix, per-family authoring gaps, and what is actually playable. It reports
+coverage, not progress: a module with wording and no audio is unplayable, and is
+counted as unplayable.
+
+### A check that named the wrong function
+
+`deploy:check` printed `functions deploy compose` whatever had actually changed.
+Following it deploys one function and then writes a marker claiming everything is
+current — so a genuinely stale function is recorded as deployed and the next check
+says it is fine. It now derives the changed functions from the diff, and treats a
+`_shared/` change as staling every function that imports it.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.

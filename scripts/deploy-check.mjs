@@ -25,10 +25,11 @@
 //   git rev-parse HEAD > supabase/functions/DEPLOYED
 
 import { execSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const MARKER = join('supabase', 'functions', 'DEPLOYED');
+const FUNCTIONS = join('supabase', 'functions');
 
 function fail(message) {
   console.error(`\n  ${message}\n`);
@@ -84,12 +85,51 @@ if (changed === '') {
 }
 
 const commits = changed.split('\n');
+
+/**
+ * WHICH functions changed, not a guess.
+ *
+ * This used to print `functions deploy compose` whatever had actually changed.
+ * Following that instruction deploys one function, then writes a marker claiming
+ * everything is current — so a genuinely stale function is recorded as deployed
+ * and the next check says it is fine. A wrong answer that silences the check is
+ * worse than no check.
+ *
+ * `_shared/` belongs to every function that imports it, so a change there means
+ * redeploying all of them.
+ */
+const touched = execSync(
+  `git diff --name-only ${deployed}..HEAD -- supabase/functions/ ":!supabase/functions/DEPLOYED"`,
+  { encoding: 'utf8' }
+).trim();
+
+const dirtyPaths = dirty
+  .split('\n')
+  .map((line) => line.slice(3).trim())
+  .filter(Boolean);
+
+const paths = [...touched.split('\n'), ...dirtyPaths].filter(Boolean);
+const shared = paths.some((f) => f.includes('supabase/functions/_shared/'));
+
+const functions = shared
+  ? readdirSync(FUNCTIONS, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && !e.name.startsWith('_'))
+      .map((e) => e.name)
+  : [...new Set(
+      paths
+        .map((f) => /supabase\/functions\/([^/]+)\//.exec(f)?.[1])
+        .filter((n) => n && !n.startsWith('_'))
+    )];
+
 console.error(
   `\n  Edge Functions are STALE. ${commits.length} commit(s) have touched ` +
   `supabase/functions/ since ${deployed.slice(0, 8)}:\n` +
   commits.map((c) => `    ${c}`).join('\n') +
-  `\n\n  Redeploy, then update the marker:\n` +
-  `    npx supabase functions deploy compose\n` +
-  `    git rev-parse HEAD > ${MARKER}\n`
+  (shared
+    ? `\n\n  _shared/ changed, so every function that imports it is stale.`
+    : '') +
+  `\n\n  Redeploy these, then update the marker:\n` +
+  functions.map((f) => `    npx supabase functions deploy ${f}`).join('\n') +
+  `\n    git rev-parse HEAD > ${MARKER}\n`
 );
 process.exit(1);
