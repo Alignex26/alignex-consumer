@@ -71,6 +71,7 @@ Deno.serve(async (req: Request) => {
     locale?: unknown;
     voice_profile?: unknown;
     version?: unknown;
+    speed?: unknown;
   };
   try {
     body = await req.json();
@@ -87,6 +88,17 @@ Deno.serve(async (req: Request) => {
   const voiceProfile = String(body.voice_profile ?? "");
   const requestedVersion =
     typeof body.version === "number" ? body.version : null;
+
+  // DELIVERY PACE, AND THE ISOLATION THAT COMES WITH IT.
+  //
+  // Asking for a pace makes this a PACING TEST, and a pacing test must not be
+  // able to destroy an approved master. So the staging path changes with it:
+  // production renders keep `staging/<locale>/<voice>/`, and a paced render goes
+  // to `staging/pacing/` under a name carrying its speed. Nothing a test writes
+  // can land on the path a production master is finalised from, and there is no
+  // flag to get that wrong with — the isolation follows from the request.
+  const requestedSpeed =
+    typeof body.speed === "number" ? body.speed : null;
 
   if (!moduleKey || !locale || !voiceProfile) return fail("bad_request");
 
@@ -196,7 +208,10 @@ Deno.serve(async (req: Request) => {
   //
   // Raw provider output, stored under `staging/`. Not a master, not a rendition,
   // and deliberately nowhere near the paths the composer signs.
-  const stagingPath = `staging/${locale}/${voiceProfile}/${moduleKey}.v${version.version}.mp3`;
+  const stagingPath = requestedSpeed === null
+    ? `staging/${locale}/${voiceProfile}/${moduleKey}.v${version.version}.mp3`
+    : `staging/pacing/${locale}/${voiceProfile}/${moduleKey}.v${version.version}` +
+      `.s${String(requestedSpeed).replace(".", "_")}.mp3`;
 
   const store = async (path: string, bytes: Uint8Array) => {
     const { error } = await admin.storage
@@ -219,11 +234,15 @@ Deno.serve(async (req: Request) => {
       text: script,
       voice: voiceProfile,
       characterCount: script.length,
-      cacheKey: `${locale}:${voiceProfile}:${moduleKey}:v${version.version}`,
+      cacheKey: requestedSpeed === null
+        ? `${locale}:${voiceProfile}:${moduleKey}:v${version.version}`
+        : `${locale}:${voiceProfile}:${moduleKey}:v${version.version}:s${requestedSpeed}`,
       // Production render, not session speech: this is not measured against the
       // per-session dynamic budget, which governs speech generated during a
       // session. A duration is measured properly by the finalise step.
       estimatedSeconds: 0,
+      // Undefined when nothing asked, which leaves the request body unchanged.
+      ...(requestedSpeed === null ? {} : { speed: requestedSpeed }),
     });
   } catch (error) {
     const failure = error instanceof SynthesisError ? error.failure : "provider_error";
@@ -240,6 +259,10 @@ Deno.serve(async (req: Request) => {
     module_version_id: version.id,
     staging_path: stagingPath,
     characters: result.billedCharacters,
+    // Null for a production render. A number means this was a pacing test and
+    // went to an isolated path.
+    speed: requestedSpeed,
+    pacing_test: requestedSpeed !== null,
     // Explicitly NOT a rendition and NOT playable. The finalise step converts to
     // specification, measures the real duration, and writes the rendition row
     // with approved = false for a human to approve.

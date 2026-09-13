@@ -85,11 +85,45 @@ describe('configuration comes only from the environment', () => {
     }
   });
 
-  it('embeds no model or voice id in the adapter', () => {
-    // A model id in code would make changing model a code change, and would put
-    // a vendor's vocabulary into ELSEA's domain.
+  it('selects no model or voice in the adapter', () => {
+    // THE RULE, RESTATED PRECISELY. It used to be "no model id appears in this
+    // file", which is a proxy for what actually matters: changing model must
+    // never be a code change, and ELSEA's domain must never learn a vendor's
+    // vocabulary. Both still hold.
+    //
+    // Model ids now DO appear here, in one place: a table of which ElevenLabs
+    // models honour `voice_settings.speed`. That is vendor knowledge, not a
+    // choice — this file has no default model and no fallback, the id still
+    // comes from the environment, and `ELEVENLABS_SPEED_SUPPORTED=true`
+    // overrides the table, so adopting a new model remains configuration only.
+    //
+    // The alternative was sending the speed field blind to models that ignore
+    // it, which returns 200 and audio at the wrong pace.
     expect(ADAPTER).toContain("env('ELEVENLABS_MODEL_ID')");
-    expect(ADAPTER).not.toMatch(/eleven_(multilingual|turbo|monolingual)/);
+    expect(ADAPTER).toContain("env('ELEVENLABS_SPEED_SUPPORTED')");
+
+    // No model is chosen: no default, no fallback, and nothing but the
+    // configured value is ever sent as `model_id`.
+    expect(ADAPTER).toContain('model_id: config.modelId');
+    expect(ADAPTER).not.toMatch(/modelId\s*[|?]{2}\s*['"]/);
+    expect(ADAPTER).not.toMatch(/DEFAULT_MODEL|FALLBACK_MODEL/);
+
+    // Every model id in the file belongs to the capability table and nowhere
+    // else.
+    const capability = ADAPTER.slice(
+      ADAPTER.indexOf('const SPEED_CAPABLE_MODELS'),
+      ADAPTER.indexOf(']);', ADAPTER.indexOf('const SPEED_CAPABLE_MODELS'))
+    );
+    const elsewhere = ADAPTER.replace(capability, '');
+    expect(elsewhere).not.toMatch(/eleven_(multilingual|turbo|monolingual|flash)/);
+  });
+
+  it('the domain still knows no vendor vocabulary', () => {
+    // The point of the original rule, checked where it actually matters.
+    const composition = readFileSync(join(root, 'src', 'lib', 'composition.ts'), 'utf8');
+    expect(composition.toLowerCase()).not.toContain('elevenlabs');
+    expect(composition).not.toMatch(/eleven_(multilingual|turbo|monolingual|flash)/);
+    expect(composition).not.toContain('voice_settings');
   });
 
   it('the app bundle knows nothing about any of this', () => {

@@ -42,6 +42,17 @@ export type SynthesisRequest = {
    * an Edge Function. The real length is measured where the file can be read.
    */
   estimatedSeconds: number;
+  /**
+   * Delivery pace, as a multiple of the voice's normal speaking speed.
+   *
+   * PROVIDER-NEUTRAL ON PURPOSE. It says how fast to speak, not how any one
+   * vendor spells that. An adapter maps it, and refuses if its provider cannot
+   * honour it — silently ignoring it would produce audio at the wrong pace with
+   * nothing to show why.
+   *
+   * Omitted means "as configured", which means unchanged.
+   */
+  speed?: number;
 };
 
 export type SynthesisResult = {

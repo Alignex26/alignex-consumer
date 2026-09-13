@@ -41,13 +41,13 @@ Last updated: 2026-09-09.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 647 passing across 22 suites |
+| Tests | 742 passing across 24 suites |
 | TypeScript | clean |
 | Lint | clean |
 | Migrations | 16 written, **all applied** |
 | Edge functions | `interpret`, `compose`, `voice-check`, `generate-master` deployed and current |
 | Deployment parity | current — marker `14b7dc42`; `generate-master` deployed 2026-09-10 |
-| Audio content | **none exists** |
+| Audio content | first masters exist — see §6q. **No module is playable yet.** |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content exists** |
 | Voices | `warm` and `clear` active; `bright` exists but is **not mapped or selectable** |
 | Blocking | recorded voice masters. Scripts approved; provider wired but never called live. |
@@ -379,7 +379,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 647 across 22 suites
+### Tests — 742 across 24 suites
 
 | Suite | Covers |
 |---|---|
@@ -398,6 +398,8 @@ All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 | `novelty-simulation.test.ts` | 30 repeated sessions per recipe; reports freshness, asserts no target. |
 | `schema-reachability.test.ts` | That every schema object has a writer, or is recorded as deliberately unwritten. |
 | `spatial-audio.test.ts` | The sound layer: duration is untouchable, every layer stops together, absent assets degrade to voice-only, and no claim is made. |
+| `mastering.test.ts` | The mastering stage, run for real through ffmpeg: a take above the true-peak ceiling is brought onto the specification, and the specification itself did not move. |
+| `delivery-pace.test.ts` | Provider speaking pace: asking for nothing changes nothing, an unsupported pace fails before the call, and a pacing test cannot reach a production path. |
 
 ---
 
@@ -1440,13 +1442,472 @@ No module became playable. No rendition was created or approved. No audio, no
 ElevenLabs call. The scripts are byte-identical — asserted by character count
 against the figures verified by SHA-256 before the first import.
 
+## 6p. The mastering investigation: two wrong answers and the real one
+
+The first real **Clear** master for `nr_arrive_short / en / version 1` came back
+from ElevenLabs and `finalise-master` refused it:
+
+```
+duration     11.70s        codec  aac      44100 Hz   mono   ~100k
+loudness     -17.0 LUFS    against -16 +/-1
+true peak    -0.9 dBTP     against <= -1        <- rejected on this
+```
+
+One tenth of a decibel. **Nothing was wrong with the take.** The stage whose job
+is to move audio *onto* the specification was failing the file for a miss it had
+itself introduced.
+
+### Root cause — two defects, compounding
+
+1. **One loudnorm pass.** Single-pass loudnorm estimates as it goes and lands
+   *near* a target rather than on it. That is a transcode, not a master, and it
+   is why the loudness came out at -17.0 against a -16 target.
+
+2. **Aiming at the ceiling.** loudnorm's true-peak limiting acts on PCM. AAC then
+   reconstructs a slightly different waveform and can add inter-sample peaks a
+   few tenths of a decibel above what went in. Aiming at exactly -1 dBTP
+   therefore lands just *over* -1, reliably. That is the -0.9.
+
+Between them, the provider was being asked to hit a mastering target by luck.
+The gate was correct throughout; what fed it was not.
+
+### The fix
+
+The chain moved into `scripts/lib/mastering.mjs`, which `finalise-master.mjs`
+now imports, and became a real two-pass master:
+
+- **Pass one** measures the trimmed source.
+- **Pass two** applies those measurements with `linear=true` — a single gain
+  offset across the whole file, so speech dynamics survive rather than being
+  compressed. Where a take's crest factor is too high for one uniform gain to
+  satisfy both targets, loudnorm falls back to limiting the transients. That is
+  what mastering is *for*, and it is not a reason to reject a take.
+- **The aim moved to -1.5 dBTP**, leaving the encoder half a decibel of headroom
+  so the *encoded* file lands under the ceiling.
+
+`SPEC.truePeak` is still `-1` and is still what the gate checks. `truePeak` and
+`masterTruePeak` are now separate named values so the distinction between *what
+is checked* and *what is aimed at* cannot quietly collapse again.
+
+**Nothing was weakened.** No tolerance widened, no filter added, no baked-in
+fade, no change to script wording or duration, and the measurement that decides
+is still taken on the encoded master rather than on the source or intermediate
+PCM.
+
+### Measured, same source into both chains
+
+```
+staged source     -17.79 LUFS   -0.21 dBTP    breaks the spec on both counts
+OLD single-pass   -16.20 LUFS   -0.56 dBTP    REJECTED: true peak -0.6 dBTP
+NEW two-pass      -16.21 LUFS   -1.40 dBTP    PASS   aac 44100Hz mono 11.80s
+```
+
+### The tests run the real chain
+
+`mastering.test.ts`, 31 tests. The ffmpeg-backed ones build a source that
+genuinely breaks the specification, master it through the same library the script
+runs, and assert on the encoded result. A guard test asserts the source really
+was non-compliant, so the suite cannot pass vacuously — the failure mode this
+project keeps hitting is a check that reports success while confirming the wrong
+thing (see §6 on the loudness check that never executed).
+
+Three defects were found in the tests themselves while writing them, and all
+three are the same shape:
+
+- The fixture's transient sat at `t=0`, where the chain's own silence trim
+  clipped it. The assertion was measuring something other than what it named.
+- One ordering assertion anchored on `storage/v1/object`, which also matches the
+  **download** of the staged render — necessarily earlier than the gates, so the
+  assertion proved nothing. Re-anchored on the upload's own `x-upsert` header.
+- **The fixture was flaky.** `anoisesrc` is unseeded, so the peak moved run to
+  run: -0.2 dBTP on one run, -1.7 on the next. The guard would have passed
+  locally and failed at random later, which is worse than no guard. Seeded at
+  `1729`, recalibrated, and confirmed identical across three consecutive runs.
+
+One pre-existing assertion in `master-generation.test.ts` was grepping
+`finalise-master.mjs` for gate strings that had moved into the library. Updated
+to follow the code — same assertions, right file.
+
+### What this pass did NOT do
+
+- **No ElevenLabs call.** The mastering library has no network access at all, and
+  a test asserts that.
+- **The Clear staged MP3 is preserved** and untouched. A mastering defect is
+  fixed by mastering again, not by paying for the take twice.
+- **Nothing was uploaded, approved or written to the database.** No Supabase
+  access of any kind.
+- **Bright was not finalised.**
+
+### The fix above was incomplete. A second defect was underneath it.
+
+Re-running `finalise-master` on the same staged Clear render with the two-pass
+chain in place produced something worse:
+
+```
+source    -27.5 LUFS   -8.9 dBTP
+aiming    -16 LUFS     -1.5 dBTP
+master    -16.6 LUFS   +1.4 dBTP      REJECTED
+```
+
+**+1.4 dBTP against a -1.5 dBTP target — nearly 3 dB the wrong side of the aim.**
+A limiter that misses by 3 dB is not a limiter that needs tuning; it is a limiter
+that is not being applied to the audio in question.
+
+#### The apparent 10 dB discrepancy was not a discrepancy
+
+The run before this one had reported -17.0 LUFS / -0.9 dBTP for what looked like
+the same file, and the new code reported -27.5 / -8.9. That looked like a
+measurement fault and was not one. **The old code measured `masterFile` only** —
+it printed the encoded output and never measured or printed the staged source at
+all, which is why its figures were reported next to `codec: aac` and `~100k`.
+
+So the two numbers describe different files: -17.0 / -0.9 was the OLD CHAIN'S
+OUTPUT, and -27.5 / -8.9 is the staged source, measured and printed for the first
+time. Nothing changed but what was being shown. The staged render is genuinely
+quiet.
+
+#### Two wrong diagnoses, recorded because they were acted on
+
+**First: stereo.** The theory was that the staged render was stereo and the
+encoder's `-ac 1` downmix moved peaks after loudnorm had limited them. The
+arithmetic was tidy — a downmix adds +3.01 dB, the master overshot by +2.94 — and
+it reproduced on synthetic stereo sources. Inspection of the real object killed
+it:
+
+```
+sha256   6e619d343f675fb2c85249f11bd71e32c372857ff0d2ed56dead931abf51e385
+bytes    190633
+mp3, 44100 Hz, 1 channel MONO, 128k, 11.84s
+untouched          -27.52 LUFS   -8.91 dBTP
+downmixed to mono  -27.52 LUFS   -8.91 dBTP   (identical — already mono)
+```
+
+**Second: linear mode.** The next theory was that `linear=true` let loudnorm apply
+full gain without limiting. Inspection killed that too — loudnorm was already in
+dynamic mode and already delivering exactly the aim:
+
+```
+loudnorm says   dynamic   -16.60 LUFS   -1.50 dBTP
+encoded AAC               -16.62 LUFS   +1.44 dBTP
+```
+
+Both changes were kept, because both are correct on their own terms — conforming
+format before a limiter is right for any stereo or off-rate render, and relying on
+an undocumented internal fallback was never defensible. But neither was the fault,
+and a tidy coincidence is not evidence.
+
+#### The actual cause: the encoder
+
+loudnorm delivered -1.50 dBTP and said so. The AAC encoder then added nearly 3 dB
+of true peak. Verified on this machine at every stage, three independent
+measurement routes agreeing at each:
+
+```
+stage                   loudnorm-json     ebur128        astats(sample)
+A conformed PCM         -27.53 / -8.98   -27.20 / -9.00      -9.18
+B post-loudnorm PCM     -16.15 / -1.50   -16.00 / -1.50      -1.50
+C encoded AAC           -16.34 / -1.28   -16.10 / -1.30      -1.29
+```
+
+The parser was audited and is clean: no `parseFloat`, no regex on the number, no
+sign stripping; the one `Math.abs` is on the loudness tolerance, and the peak gate
+is a plain signed `>`. The value is read straight out of `JSON.parse`.
+
+**How much the encoder adds depends on the content and the build**, and it is not
+small. Measured here at 96 kbps:
+
+```
+speech-like (lowpassed)      +0.76 dB
+full band, no lowpass        +0.84 dB
+bright, HF-heavy             +0.49 dB
+white noise, full band       +2.11 dB
+```
+
+On this machine the real source shape overshoots by 0.22 dB; on the machine that
+produced that master it overshot by 2.94 dB. Neither figure is one the pipeline
+can assume.
+
+#### The fix: close the loop on the file that ships
+
+`masterToSpecification` masters, encodes, **measures the encoded AAC**, and if the
+encoder pushed the true peak over the ceiling it aims lower and encodes again.
+
+```
+AIM_LADDER = [-1.5, -2, -2.5, -3, -3.5, -4, -4.5, -5]
+```
+
+**The specification never moves.** Every attempt is measured against the same -16
+LUFS +/-1 and the same -1 dBTP ceiling, and loudness is re-checked at every rung —
+only a true-peak miss earns another attempt, because aiming lower cannot fix a
+long take and can only make loudness worse. The ladder stops at -5 because that is
+where loudness measurably falls out of tolerance on the real source shape:
+
+```
+aim    encoded LUFS   encoded dBTP
+-1.5      -16.34         -1.28
+-3.0      -16.40         -2.68
+-4.0      -16.62         -3.33
+-5.0      -16.97         -4.02
+-6.0      -17.47         -5.54   <- out of tolerance, so not on the ladder
+```
+
+Past that the two requirements genuinely conflict, and the run refuses rather than
+publish something quiet.
+
+Reproduced in the test suite: a high-crest, full-band source where loudnorm reports
+a clean -1.50 dBTP and the encoded file measures **-0.65 dBTP, over the ceiling**.
+The loop tightens to -2 and publishes at -1.14 dBTP with loudness at -16.14. Both
+conditions are needed — high crest so the peak constraint binds, full-band content
+so the encoder overshoots — which is why thirty earlier synthetic shapes missed it.
+
+#### A limiter was added as a backstop, and then removed
+
+`alimiter` was tried after loudnorm and removed after measurement, because it made
+correct output worse:
+
+```
+loudnorm alone                      -16.36 LUFS   -1.21 dBTP   pass
++ alimiter at -1.5 dB               -16.31 LUFS   -0.66 dBTP   OVER CEILING
++ alimiter 4x oversampled, -1.5 dB  -16.37 LUFS   -0.93 dBTP   OVER CEILING
+```
+
+It limits **sample** peaks, not true peaks, so it engages on peaks that were never
+over and its ripple adds inter-sample content the encoder exaggerates.
+
+#### Why the earlier synthetic tests missed it
+
+The first thirty shapes varied sample rate, channel count, loudness and crest, and
+all passed. Every one had an **LRA near 0.2** — tremolo-modulated noise has no
+phrases, and speech does; the real file's LRA is 2.80. The fixtures now build
+their beds from stepped segments, which produces a realistic LRA, and the
+encoder-overshoot fixture adds the full-band content the earlier ones lacked.
+
+### Read this before trusting a green run
+
+The seven ffmpeg-backed tests **skip** where `ffmpeg` and `ffprobe` are not on
+`PATH`, so the suite stays portable. That means a green `npm test` is not by
+itself evidence that the mastering fix was exercised: the run reports
+`7 skipped, 24 passed` and still exits 0.
+
+On this machine ffmpeg is a winget install and is **not** on the default `PATH`:
+
+```
+C:\Users\hayle\AppData\Local\Microsoft\WinGet\Packages\
+  Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.1-full_build\bin
+```
+
+Put that on `PATH` before running the suite if the mastering behaviour is what
+you are checking. The figures above were measured with it present and all 31
+tests executing.
+
+### State
+
+`npm run verify` exit 0 — 742 tests, 24 suites, with ffmpeg on `PATH`; the
+mastering suite runs 66/66 with nothing skipped.
+`npm run typecheck` exit 0.
+
+**Uncommitted.** `scripts/lib/mastering.mjs`, `scripts/inspect-staged.mjs` and
+`src/__tests__/mastering.test.ts` are new; `scripts/finalise-master.mjs` and
+`src/__tests__/master-generation.test.ts` are modified.
+
+Clear is ready to re-master from the existing staged file, with no regeneration:
+
+```
+node scripts/finalise-master.mjs --module nr_arrive_short --locale en --voice clear --commit
+```
+
+## 6q. Live audio state — reported, inferred, and unverified
+
+This section is deliberately separated from the rest because **I have not read
+the live database in this pass.** The operator credential exists only in the
+product owner's PowerShell session, and the content tables are service-role only,
+so an anon read returns nothing. What follows is labelled by how it is known.
+
+### Reported by the product owner
+
+- The first real **Warm** master for `nr_arrive_short / en / warm / version 1`
+  was produced, passed the production specification, and was **listened to and
+  approved** by the product owner.
+- A real **Clear** staged MP3 exists at
+  `staging/en/clear/nr_arrive_short.v1.mp3`. Measured by the current code its
+  source is **-27.5 LUFS / -8.9 dBTP** — quiet, and needing around 11 dB of gain.
+  The -17.0 / -0.9 figure reported earlier was the old chain's *output*, not this
+  file; see §6p.
+- **Two `finalise-master` runs on it have been rejected**, both correctly, and
+  neither uploaded anything. The second rejection exposed the downmix defect.
+
+### Inferred, not verified
+
+The casting-pass PowerShell block ordered the operations: generate Clear,
+finalise Clear, generate Bright, finalise Bright, **then** approve Warm. The
+Clear finalise failed on the true-peak gate, which halted the block before the
+approval step.
+
+**So the Warm rendition is very probably still `approved = false` in the
+database, despite having been approved by a human.** That is an inference from
+the block's ordering and the reported failure, not a reading of the row. It must
+be checked before anyone concludes that audio approval is broken.
+
+### The staged Clear render, now verified
+
+Read off the object rather than inferred:
+
+```
+sha256   6e619d343f675fb2c85249f11bd71e32c372857ff0d2ed56dead931abf51e385
+bytes    190633
+mp3, 44100 Hz, 1 channel MONO, 128k, 11.84s
+-27.52 LUFS   -8.91 dBTP
+```
+
+Quiet, mono, and needing about 11.5 dB of gain it has no peak headroom for. Three
+`finalise-master` runs on it have been rejected, all correctly, none of which
+uploaded anything.
+
+### Diagnosed
+
+Inspection settled it (§6p). loudnorm delivers exactly -1.50 dBTP in dynamic
+mode; the AAC encoder then adds nearly 3 dB. Mastering now closes the loop on the
+encoded file and aims lower when the encoder spoils it.
+
+**Expected on the next run:** the first aim of -1.5 will still produce roughly
++1.4 dBTP, and the ladder will tighten — on these numbers to about -4, landing
+near -1.1 dBTP with loudness around -16.6. `finalise-master` prints every attempt
+and the overshoot each one cost, so the encoder's behaviour on that machine
+becomes visible rather than inferred.
+
+If the ladder is exhausted the run refuses and uploads nothing, which is the
+correct outcome: it would mean this take cannot meet both limits at 96 kbps, and
+that is a decision to take deliberately, not by publishing something quiet.
+
+### Not started
+
+- **Bright** — not generated. No staged file.
+- No module has `intervention_modules.approved = true`, so nothing is playable
+  and every session still runs on the silent catalogue fallback.
+
+### The ordering lesson
+
+`finalise-master.mjs` writes `approved: false` on **every** run. Re-finalising an
+already-approved rendition therefore silently un-approves it. The casting block
+approved Warm last for that reason — but that ordering is also what left the
+human approval unrecorded when the block halted early. Approving Warm is
+independent of generating Clear and Bright and should not have been sequenced
+behind them.
+
+## 6r. Delivery pace — slowing the cast voices
+
+All three cast voices (`warm`, `clear`, `bright`) were listened to and liked. The
+only note was delivery: **all three read slightly too quick.** Target is 10-15%
+slower, starting at **0.88x**.
+
+Nothing about the scripts changed. Pace is a provider setting, and slowing speech
+by rewriting punctuation would be editing approved wording.
+
+### How pace is controlled
+
+ElevenLabs carries it as `voice_settings.speed`, a multiple of normal speaking
+rate, accepted range **0.7 to 1.2**. The adapter previously sent no
+`voice_settings` at all — just `text` and `model_id`.
+
+It is now configuration-driven at two levels:
+
+| | |
+|---|---|
+| `ELEVENLABS_SPEED` | Edge Function secret. Absent = unchanged. **Still unset.** |
+| `ELEVENLABS_SPEED_SUPPORTED` | Overrides the model capability table. Unset. |
+| `speed` in the `generate-master` request | Per-render override, for tests |
+
+**Asking for nothing changes nothing**, and that is asserted rather than assumed:
+with no speed configured and none requested, the request body is byte-identical
+to what it was before pace existed. An explicit `1.0` is also treated as no
+instruction, because normal speed is the absence of one — sending
+`voice_settings` in that case would alter an approved voice.
+
+### It fails closed on a model that would ignore it
+
+`speed` is not universal across ElevenLabs models: the **v3 line takes direction
+through inline audio tags and ignores `voice_settings.speed`**. A model that
+ignores it returns 200 with audio at the original pace — a silent wrong answer
+that costs a production take to discover.
+
+So the adapter refuses before calling out, and names the model in the failure:
+
+```
+speed_unsupported: <model id>
+```
+
+The known-good list is deliberately conservative — `eleven_multilingual_v2`,
+`eleven_turbo_v2`, `eleven_turbo_v2_5`, `eleven_flash_v2`, `eleven_flash_v2_5` —
+and **`ELEVENLABS_SPEED_SUPPORTED=true` overrides it**, so adopting a new
+speed-capable model stays configuration rather than a code change.
+
+This did collide with an existing rule: *no model id in the adapter, so changing
+model is never a code change.* The rule is about **choosing** a model, and nothing
+here chooses one — there is no default and no fallback, the id still comes from
+the environment, and the override means the table gates nothing. What the table
+holds is vendor knowledge, which is what that file exists to contain. The test
+that enforced the rule by grepping for model ids now asserts the intent directly:
+no model is selected in code, every model id in the file belongs to the capability
+table, and the domain still knows no vendor vocabulary.
+
+**`ELEVENLABS_MODEL_ID` is an Edge Function secret and has not been read.** If the
+configured model is a v3, the first paced request will fail with
+`speed_unsupported` naming it, and the answer is a model change, not a parameter
+change.
+
+### A pacing test cannot destroy an approved master
+
+The isolation follows from the request rather than from a separate flag, so there
+is no combination of arguments that lands a test on a production path:
+
+| | production | pacing test |
+|---|---|---|
+| staging | `staging/<locale>/<voice>/<key>.v<n>.mp3` | `staging/pacing/<locale>/<voice>/<key>.v<n>.s0_88.mp3` |
+| master | `modules/<locale>/<voice>/<key>.m4a` | `pacing/<locale>/<voice>/<key>.s0_88.m4a` |
+| rendition row | written, `approved: false` | **none** |
+| cache key | `…:v<n>` | `…:v<n>:s0.88` |
+
+`finalise-master --speed 0.88` exits before both the upload of a production master
+and the rendition write. The approved Warm rendition and the approved Warm master
+are untouched by construction.
+
+### Explicitly not done
+
+- **No time-stretching.** `atempo`, `rubberband` and `asetrate` appear nowhere,
+  and a test asserts it. Faking pace in post was not approved.
+- **No change to wording, punctuation, structure, recipes, the audio production
+  specification, loudness, mastering, duration ceilings or voice identities.**
+- **No default change.** The three approved voices keep their current delivery
+  until the product owner approves the slower one.
+
+### To run the test
+
+One Warm render only, at 0.88x:
+
+```powershell
+$h = @{ apikey = $env:SUPABASE_SERVICE_ROLE_KEY
+        Authorization = "Bearer $env:SUPABASE_SERVICE_ROLE_KEY"
+        'Content-Type' = 'application/json' }
+Invoke-RestMethod -Method Post -Headers $h `
+  -Uri "$env:EXPO_PUBLIC_SUPABASE_URL/functions/v1/generate-master" `
+  -Body '{"module_key":"nr_arrive_short","locale":"en","voice_profile":"warm","speed":0.88}'
+
+node scripts/finalise-master.mjs --module nr_arrive_short --locale en --voice warm --speed 0.88 --commit
+```
+
+The finalise step runs the same mastering pipeline as production (§6p), so the
+paced take is held to the same specification: <= 21s, AAC-LC 44.1 kHz mono,
+-16 LUFS +/-1, true peak <= -1 dBTP.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
 
-- **No audio content and no approved modules.** `intervention_modules` is
-  empty. Every session runs on the catalogue fallback, silent, which the UI
-  states. This is the blocker.
+- **No playable modules.** `intervention_modules` now holds the five
+  `nervous_ready` records with approved wording, and the first masters exist
+  (§6q) — but nothing has `approved = true`, so the composer selects none of
+  it. Every session still runs on the catalogue fallback, silent, which the UI
+  states. This remains the blocker.
 - **Manifest persistence is atomic but still unexercised.** It now writes
   through a `security definer` RPC so a manifest and its segments land
   together or not at all. The rows are checked against the real schema
@@ -1456,10 +1917,11 @@ Stated plainly so none is mistaken for finished work.
 - **Nothing writes `session_costs`.** The manifest link and every column exist;
   the row does not, because there is no generation to cost. Needs a TTS
   provider.
-- **ElevenLabs is wired but has never been called live.** The adapter exists
-  behind the provider boundary and is unit-proven; no real request has been
-  made, because `voice-check` requires the service-role key. No dynamic speech
-  is generated in a session, so sessions still bill nothing. See §6h.
+- **ElevenLabs has now been called live, for production masters only.** Warm
+  and Clear renders of `nr_arrive_short` were generated through
+  `generate-master` (§6q). This is offline, build-time voice production; it is
+  **not** session TTS. No dynamic speech is generated during a session, nothing
+  writes `generated_segments`, and sessions still bill nothing. See §6h.
 - **Edge Function typechecking is real but partial.** `npm run
   typecheck:functions` checks the functions' own logic — imports resolve, names
   exist, types line up — using hand-written ambient stubs in
@@ -1593,11 +2055,13 @@ started.
 Everything else in §8 is real, but only one thing moves ELSEA toward a playable
 session. Stated here so it is not lost among the rest.
 
-> **Get the five drafted `nervous_ready` scripts through content and clinical
-> review, then recorded.**
+> **Finish voice production for the five `nervous_ready` modules, then approve
+> the audio.**
 >
-> Drafting is done — see §6f. What stands between here and a real session is
-> now review, approval and a recording session, none of which is engineering.
+> Drafting, review and content approval are done (§6f, §6n), and the five
+> records are imported. Voice production has started and is one module in —
+> see §6q for exactly where. What remains is mastering, listening and approval,
+> plus the engineering already built to carry it.
 
 | Module | Family | Duration | Why this length |
 |---|---|---:|---|
@@ -1637,12 +2101,23 @@ silently removes the five-minute session from `wired_sleep`.
    recording.
 2. ~~Approval~~ — **granted.** The `approved` flag flips at import, once audio
    exists.
-3. Record to the audio specification; update `duration_seconds` to the measured
-   lengths and set `approved` true for what passed.
-4. Validate the manifest with `--audio-dir` — `ffmpeg` required, see §8.
-5. Dry-run the import, read the plan.
-6. Commit the import with a service-role key: uploads audio, writes module rows
-   and their immutable version rows.
+3. ~~Import the five content records~~ — **done.** Wording, ceilings and
+   version rows are in the database; content approval is recorded. Audio is a
+   separate step, and a separate approval (§6n).
+4. **In progress — voice production, one module deep.** `nr_arrive_short` has a
+   Warm master produced and human-approved, and a Clear staged render awaiting
+   re-mastering. The immediate actions, in this order:
+   1. **Approve the Warm rendition.** It was approved by a human but the
+      database row very probably does not say so — see §6q. Independent of
+      everything below; do it first.
+   2. **Re-master Clear** from the existing staged MP3. No regeneration, no
+      provider call: `node scripts/finalise-master.mjs --module nr_arrive_short
+      --locale en --voice clear --commit`.
+   3. **Generate and finalise Bright**, then listen to all three and decide
+      casting.
+   4. **Repeat for the remaining four modules** in the three cast voices.
+5. Set `approved` true on the modules whose audio has been listened to and
+   accepted. Nothing is playable until this happens (§6n).
 7. **First real composition** — the composer selects approved modules for the
    first time.
 8. **First manifest persisted** — never executed before.

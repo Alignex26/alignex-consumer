@@ -27,6 +27,7 @@ const GENERATOR = read('supabase', 'functions', 'generate-master', 'index.ts');
 const FINALISE = read('scripts', 'finalise-master.mjs');
 const SCRIPT_MIGRATION = read('supabase', 'migrations', '20260910170000_approved_script_text.sql');
 const ADAPTER = read('supabase', 'functions', '_shared', 'elevenlabs.ts');
+const MASTERING = read('scripts', 'lib', 'mastering.mjs');
 
 describe('arbitrary text cannot reach the provider', () => {
   it('the request carries identifiers, never speech', () => {
@@ -214,9 +215,17 @@ describe('the operator path is hard to misuse', () => {
   });
 
   it('rejects a master that misses the specification', () => {
+    // The gates moved into scripts/lib/mastering.mjs so that the mastering stage
+    // and its tests share one implementation; the refusals are unchanged. See
+    // mastering.test.ts, which exercises them rather than grepping for them.
     for (const gate of ['over ceiling by', 'expected mono', 'loudness could not be measured']) {
-      expect(FINALISE).toContain(gate);
+      expect(MASTERING).toContain(gate);
     }
+    // Mastering is now a loop — master, encode, measure the ENCODED file, aim
+    // lower if the encoder spoiled it — so the gate call moved in there too. The
+    // script reads its verdict and publishes nothing while any gate is unmet.
+    expect(MASTERING).toContain('problemsWith(result, ceiling)');
+    expect(FINALISE).toContain('masterToSpecification(rawFile, masterFile, ceiling)');
     expect(FINALISE).toContain('re-generated, not compressed to fit');
   });
 

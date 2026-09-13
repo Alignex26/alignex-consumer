@@ -24,6 +24,13 @@ type ElevenLabsConfig = {
   apiKey: string;
   voiceId: string;
   modelId: string;
+  /** Absent unless ELEVENLABS_SPEED is set. Absent means the request body is
+   *  byte-identical to what it was before pace was configurable. */
+  speed?: number;
+  /** Set when the operator has confirmed the configured model honours speed,
+   *  which lets a model absent from the known-good list be adopted without a
+   *  code change. */
+  speedSupported?: boolean;
 };
 
 export type ProviderFailure =
@@ -35,6 +42,8 @@ export type ProviderFailure =
   | 'timeout'
   | 'bad_audio'
   | 'storage_failed'
+  | 'speed_unsupported'
+  | 'speed_out_of_range'
   | 'provider_error';
 
 export class SynthesisError extends Error {
@@ -71,12 +80,93 @@ export function readConfig(env: (key: string) => string | undefined): ElevenLabs
     throw new SynthesisError('not_configured', `missing ${missing.join(', ')}`);
   }
 
-  return { apiKey: apiKey!, voiceId: voiceId!, modelId: modelId! };
+  const speedSupported = env('ELEVENLABS_SPEED_SUPPORTED') === 'true';
+
+  const rawSpeed = env('ELEVENLABS_SPEED');
+  if (rawSpeed === undefined || rawSpeed.trim() === '') {
+    return { apiKey: apiKey!, voiceId: voiceId!, modelId: modelId!, speedSupported };
+  }
+
+  const speed = Number(rawSpeed);
+  if (!Number.isFinite(speed)) {
+    throw new SynthesisError('not_configured', 'ELEVENLABS_SPEED is not a number');
+  }
+
+  return { apiKey: apiKey!, voiceId: voiceId!, modelId: modelId!, speed, speedSupported };
+}
+
+/**
+ * Decides the pace for one request, and refuses rather than send something the
+ * model will ignore.
+ *
+ * Returns undefined when nothing asked for a change, which is what keeps the
+ * default behaviour byte-identical: no `voice_settings` is sent at all.
+ */
+export function resolveSpeed(
+  config: ElevenLabsConfig,
+  requested: number | undefined
+): number | undefined {
+  const speed = requested ?? config.speed;
+  if (speed === undefined || speed === SPEED_NORMAL) return undefined;
+
+  if (!Number.isFinite(speed) || speed < SPEED_MIN || speed > SPEED_MAX) {
+    throw new SynthesisError('speed_out_of_range', `${SPEED_MIN}-${SPEED_MAX}`);
+  }
+
+  if (!config.speedSupported && !SPEED_CAPABLE_MODELS.has(config.modelId)) {
+    // The model id is a configuration value, not a credential, and naming it is
+    // the whole use of this error: it says exactly what to change, and
+    // ELEVENLABS_SPEED_SUPPORTED=true is the way to override this judgement
+    // without touching code.
+    throw new SynthesisError('speed_unsupported', config.modelId);
+  }
+
+  return speed;
 }
 
 /** Writes rendered audio somewhere private. Injected so this file never
  *  imports a storage client and can be driven in a test. */
 export type AudioStore = (path: string, bytes: Uint8Array) => Promise<void>;
+
+/**
+ * DELIVERY PACE.
+ *
+ * ElevenLabs carries this as `voice_settings.speed`, a multiple of the voice's
+ * normal speaking rate. It is NOT universal across their models — the v3 line
+ * takes direction through inline audio tags instead and ignores the field — so
+ * sending it blind produces audio at the original pace, with a 200 response and
+ * nothing anywhere to explain the result.
+ *
+ * WHY A LIST OF MODEL IDS LIVES HERE, given that the model is configuration.
+ *
+ * The rule this sits against is that no model id belongs in code, so that
+ * changing model is never a code change. That rule is about CHOOSING a model,
+ * and nothing here chooses one: the model still comes from the environment and
+ * this file has no default and no fallback.
+ *
+ * What this is instead is vendor knowledge — which models honour which field —
+ * and vendor knowledge is precisely what this file exists to contain. Keeping it
+ * out would mean either sending the field blind, or asking ELSEA's domain to know
+ * about ElevenLabs model families. Both are worse.
+ *
+ * AND IT IS NOT A GATE ON ADOPTION. `ELEVENLABS_SPEED_SUPPORTED=true` overrides
+ * the list, so a new speed-capable model can be adopted by configuration alone.
+ * The list is the safe default, not the authority.
+ */
+const SPEED_CAPABLE_MODELS = new Set([
+  'eleven_multilingual_v2',
+  'eleven_turbo_v2',
+  'eleven_turbo_v2_5',
+  'eleven_flash_v2',
+  'eleven_flash_v2_5',
+]);
+
+/** The provider's accepted range. Outside it the request is rejected. */
+const SPEED_MIN = 0.7;
+const SPEED_MAX = 1.2;
+
+/** Pace is unchanged unless something asks for a different one. */
+export const SPEED_NORMAL = 1.0;
 
 const ENDPOINT = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -117,6 +207,10 @@ export function createElevenLabsProvider(
         throw new SynthesisError('provider_error', 'empty request');
       }
 
+      // Resolved before the call, so an unsupported or out-of-range pace costs
+      // nothing. A provider call is where money is spent.
+      const speed = resolveSpeed(config, request.speed);
+
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
@@ -135,6 +229,10 @@ export function createElevenLabsProvider(
             body: JSON.stringify({
               text: request.text,
               model_id: config.modelId,
+              // Only present when a pace was actually asked for. With no speed
+              // configured and none requested this object is absent and the
+              // body is exactly what it was before pace existed.
+              ...(speed === undefined ? {} : { voice_settings: { speed } }),
             }),
           }
         );

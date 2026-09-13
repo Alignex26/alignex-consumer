@@ -25,10 +25,12 @@
 // DRY RUN BY DEFAULT. Without `--commit` nothing is uploaded and no row is
 // written.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+
+import { masterToSpecification, ffmpegVersion } from './lib/mastering.mjs';
 
 const args = process.argv.slice(2);
 const pick = (flag, fallback = null) => {
@@ -41,19 +43,22 @@ const locale = pick('--locale', 'en');
 const voice = pick('--voice');
 const commit = args.includes('--commit');
 
-const BUCKET = 'intervention-audio';
+/**
+ * PACING TEST MODE.
+ *
+ * `--speed 0.88` finalises a paced render instead of a production one. It reads
+ * from the isolated staging path that `generate-master` wrote the paced audio
+ * to, writes the master under `pacing/`, and writes NO rendition row.
+ *
+ * There is deliberately no way to point this at a production path: the source
+ * path, the destination path and the decision to skip the rendition all follow
+ * from the same flag, so a pacing test cannot overwrite an approved master by
+ * being invoked slightly wrong.
+ */
+const speed = pick('--speed');
+const pacing = speed !== null;
 
-/** From docs/audio-production-spec.md. Not varied here. */
-const SPEC = {
-  sampleRate: 44100,
-  channels: 1,
-  bitrate: '96k',
-  loudness: -16,
-  loudnessTolerance: 1,
-  truePeak: -1,
-  maxEdgeSilence: 0.1,
-  silenceThresholdDb: -50,
-};
+const BUCKET = 'intervention-audio';
 
 /** From the approved manifest. Hard, and a property of the recipe. */
 const CEILINGS = {
@@ -151,10 +156,21 @@ if (version.approved_at === null) {
   process.exit(1);
 }
 
-const staging = `staging/${locale}/${voice}/${moduleKey}.v${version.version}.mp3`;
-const masterPath = `modules/${locale}/${voice}/${moduleKey}.m4a`;
+const speedTag = pacing ? String(speed).replace('.', '_') : null;
+
+const staging = pacing
+  ? `staging/pacing/${locale}/${voice}/${moduleKey}.v${version.version}.s${speedTag}.mp3`
+  : `staging/${locale}/${voice}/${moduleKey}.v${version.version}.mp3`;
+
+const masterPath = pacing
+  ? `pacing/${locale}/${voice}/${moduleKey}.s${speedTag}.m4a`
+  : `modules/${locale}/${voice}/${moduleKey}.m4a`;
 const ceiling = CEILINGS[moduleKey];
 
+if (pacing) {
+  console.log(`  PACING TEST    speed ${speed} — no rendition row will be written,`);
+  console.log(`                 and the approved master is not written to.\n`);
+}
 console.log(`  version        ${version.version} (approved)`);
 console.log(`  staged at      ${staging}`);
 console.log(`  master path    ${masterPath}`);
@@ -182,83 +198,76 @@ const rawFile = join(workDir, 'raw.mp3');
 const masterFile = join(workDir, 'master.m4a');
 writeFileSync(rawFile, Buffer.from(await download.arrayBuffer()));
 
-// --- convert to specification ----------------------------------------------
-const filter = [
-  `silenceremove=start_periods=1:start_silence=${SPEC.maxEdgeSilence}:start_threshold=${SPEC.silenceThresholdDb}dB`,
-  'areverse',
-  `silenceremove=start_periods=1:start_silence=${SPEC.maxEdgeSilence}:start_threshold=${SPEC.silenceThresholdDb}dB`,
-  'areverse',
-  `loudnorm=I=${SPEC.loudness}:TP=${SPEC.truePeak}:LRA=7`,
-  `aresample=${SPEC.sampleRate}`,
-].join(',');
+// --- master to specification ------------------------------------------------
+//
+// The loop lives in scripts/lib/mastering.mjs. It masters, encodes, MEASURES THE
+// ENCODED FILE, and if the encoder pushed the true peak over the ceiling it aims
+// lower and encodes again. The specification is identical at every attempt.
+console.log('  mastering');
+console.log(`    ffmpeg       ${ffmpegVersion()}`);
 
-const convert = spawnSync(
-  'ffmpeg',
-  ['-hide_banner', '-loglevel', 'error', '-y', '-i', rawFile, '-af', filter,
-   '-c:a', 'aac', '-profile:a', 'aac_low', '-b:a', SPEC.bitrate,
-   '-ar', String(SPEC.sampleRate), '-ac', String(SPEC.channels), masterFile],
-  { encoding: 'utf8' }
-);
+const run = masterToSpecification(rawFile, masterFile, ceiling);
 
-if (convert.status !== 0) {
-  console.error(`  Conversion failed.\n  ${(convert.stderr ?? '').trim().split('\n').slice(-1)[0]}\n`);
+if (run.failure === 'unmeasurable') {
+  console.error('');
+  console.error('  Could not measure the staged render. Nothing was written.');
+  console.error('');
+  process.exit(1);
+}
+if (run.failure === 'encode_failed') {
+  console.error('');
+  console.error('  Conversion failed.');
+  console.error(`  ${run.stderr}`);
+  console.error('');
   process.exit(1);
 }
 
-// --- measure ----------------------------------------------------------------
-const probe = spawnSync(
-  'ffprobe',
-  ['-v', 'error', '-show_entries',
-   'stream=codec_name,sample_rate,channels,bit_rate:format=duration',
-   '-of', 'json', masterFile],
-  { encoding: 'utf8' }
+const measured = run.measured;
+console.log(
+  `    source       ${Number(measured.input_i).toFixed(2)} LUFS, ` +
+  `${Number(measured.input_tp).toFixed(2)} dBTP, LRA ${measured.input_lra}`
 );
-const info = JSON.parse(probe.stdout);
-const stream = info.streams?.[0] ?? {};
-const duration = Number(info.format?.duration);
 
-const loudRun = spawnSync(
-  'ffmpeg',
-  ['-hide_banner', '-i', masterFile, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'],
-  { encoding: 'utf8' }
-);
-const text = `${loudRun.stderr ?? ''}`;
-const s = text.lastIndexOf('{');
-const e = text.indexOf('}', s);
-let lufs = NaN, peak = NaN;
-if (s >= 0 && e > s) {
-  try {
-    const parsed = JSON.parse(text.slice(s, e + 1));
-    lufs = Number(parsed.input_i);
-    peak = Number(parsed.input_tp);
-  } catch { /* reported as unknown below */ }
+for (const attempt of run.attempts) {
+  const said = attempt.claimed === null
+    ? 'unreadable'
+    : `${attempt.claimed.normalizationType} ${attempt.claimed.outputTruePeak.toFixed(2)}`;
+  console.log(
+    `    aim ${String(attempt.aim).padStart(5)}    loudnorm ${said.padEnd(16)} ` +
+    `encoded ${attempt.result.lufs.toFixed(2)} LUFS / ${attempt.result.peak.toFixed(2)} dBTP` +
+    `${attempt.problems.length === 0 ? '   OK' : ''}`
+  );
 }
 
+if (run.attempts.length > 1 && run.ok) {
+  console.log('');
+  console.log(`    The encoder added ${(run.attempts[0].result.peak - run.attempts[0].aim).toFixed(2)} dB of`);
+  console.log(`    true peak at the first aim, so mastering aimed lower. Loudness is`);
+  console.log(`    unchanged in target and was re-checked on every attempt.`);
+}
+
+const result = run.result;
+const { duration } = result;
+const problems = run.problems;
+
 console.log('  measured');
-console.log(`    duration     ${duration.toFixed(2)}s  (ceiling ${ceiling}s)`);
-console.log(`    codec        ${stream.codec_name}`);
-console.log(`    sample rate  ${stream.sample_rate}`);
-console.log(`    channels     ${stream.channels}`);
-console.log(`    bitrate      ${stream.bit_rate ? Math.round(Number(stream.bit_rate) / 1000) + 'k' : '—'}`);
-console.log(`    loudness     ${Number.isFinite(lufs) ? lufs.toFixed(1) + ' LUFS' : 'UNMEASURED'}`);
-console.log(`    true peak    ${Number.isFinite(peak) ? peak.toFixed(1) + ' dBTP' : 'UNMEASURED'}`);
+console.log(`    duration     ${Number.isFinite(duration) ? duration.toFixed(2) + 's' : 'UNMEASURED'}  (ceiling ${ceiling}s)`);
+console.log(`    codec        ${result.codec ?? '\u2014'}`);
+console.log(`    sample rate  ${result.sampleRate}`);
+console.log(`    channels     ${result.channels}`);
+console.log(`    bitrate      ${Number.isFinite(result.bitrate) ? Math.round(result.bitrate / 1000) + 'k' : '\u2014'}`);
+console.log(`    loudness     ${Number.isFinite(result.lufs) ? result.lufs.toFixed(2) + ' LUFS' : 'UNMEASURED'}`);
+console.log(`    true peak    ${Number.isFinite(result.peak) ? result.peak.toFixed(2) + ' dBTP' : 'UNMEASURED'}`);
 
 // --- gates ------------------------------------------------------------------
-const problems = [];
-if (duration > ceiling) problems.push(`over ceiling by ${(duration - ceiling).toFixed(2)}s`);
-if (Number(stream.channels) !== SPEC.channels) problems.push(`${stream.channels} channels, expected mono`);
-if (Number(stream.sample_rate) !== SPEC.sampleRate) problems.push(`sample rate ${stream.sample_rate}`);
-if (!Number.isFinite(lufs)) problems.push('loudness could not be measured');
-else if (Math.abs(lufs - SPEC.loudness) > SPEC.loudnessTolerance) problems.push(`loudness ${lufs.toFixed(1)} LUFS`);
-if (!Number.isFinite(peak)) problems.push('true peak could not be measured');
-else if (peak > SPEC.truePeak) problems.push(`true peak ${peak.toFixed(1)} dBTP`);
-
 if (problems.length > 0) {
   console.error(`\n  REJECTED — ${problems.length} problem(s):`);
   for (const p of problems) console.error(`    - ${p}`);
   console.error(
-    `\n  Nothing was uploaded and no rendition row was written. A take that runs\n` +
-    `  long is re-generated, not compressed to fit.\n`
+    `\n  Nothing was uploaded and no rendition row was written.\n` +
+    `\n  Every true-peak aim down to the limit of the ladder was tried; loudness is\n` +
+    `  re-checked at each one, so the run stops rather than publish something quiet.\n` +
+    `  A take that runs long is re-generated, not compressed to fit.\n`
   );
   process.exit(1);
 }
@@ -281,6 +290,13 @@ const upload = await fetch(`${url}/storage/v1/object/${BUCKET}/${masterPath}`, {
 if (!upload.ok && upload.status !== 409) {
   console.error(`\n  Upload failed: ${upload.status}\n`);
   process.exit(1);
+}
+
+if (pacing) {
+  console.log('\n  Pacing test finalised. No rendition row was written and no approved');
+  console.log('  master was touched.\n');
+  console.log(`  Listen with a short-lived signed URL for:\n    ${masterPath}\n`);
+  process.exit(0);
 }
 
 // APPROVED = FALSE, ALWAYS. Synthesis is not approval, and a successful render
