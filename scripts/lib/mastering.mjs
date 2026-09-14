@@ -266,24 +266,45 @@ export function measureFinished(file) {
 }
 
 /**
- * HOW FAR THE AIM MAY BE TIGHTENED, and no further.
+ * HOW FAR THE AIM MAY BE TIGHTENED, and in what steps.
  *
- * Each step asks the limiter to hold peaks lower. Loudness is NOT touched:
- * loudnorm is still asked for -16 LUFS at every step, and the loudness gate is
- * still enforced on every attempt. Measured on the real source shape, loudness
- * survives the tightening down to about -5 and then falls out of tolerance:
+ * Each rung asks the limiter to hold peaks lower. Loudness is NOT targeted
+ * differently: loudnorm is still asked for -16 LUFS at every rung, and the
+ * loudness gate is enforced on every attempt. But tightening the peak does cost
+ * loudness, so the two constraints close on each other and the usable window can
+ * be narrow.
  *
- *     aim   encoded LUFS   encoded dBTP
- *    -1.5      -16.34         -1.28
- *    -3.0      -16.40         -2.68
- *    -4.0      -16.62         -3.33
- *    -5.0      -16.97         -4.02
- *    -6.0      -17.47         -5.54   <- loudness now out of tolerance
+ * THE STEPS USED TO BE 0.5 dB AND THAT WAS TOO COARSE. A real take was refused
+ * with both constraints failing on either side of a window it never tried:
  *
- * So the ladder stops at -5. Past that the two requirements genuinely conflict
- * and the honest answer is to refuse, not to publish something quiet.
+ *     aim    encoded LUFS   encoded dBTP
+ *    -1.5       -16.82         +0.68     peak fails
+ *    -1.6       -16.87         -1.49     PASS        <- never attempted
+ *    -1.7       -16.91         -1.55     PASS        <- never attempted
+ *    -1.8       -16.96         -1.72     PASS        <- never attempted
+ *    -1.9       -17.01         -1.79     loudness fails
+ *    -2.0       -17.05         -1.87     loudness fails, by 0.05 dB
+ *
+ * The old ladder went -1.5, then -2.0, and stopped. Three passing aims sat
+ * between them.
+ *
+ * Note how violently the encoded peak moves: 0.1 dB of aim changed it by 2.17 dB.
+ * The encoder is sharply non-linear near its threshold, so a coarse search over
+ * it is not a search at all. Hence 0.1 dB resolution where the window lives, and
+ * coarser steps below, where the peak is long since safe and only loudness is
+ * still in play.
+ *
+ * It stops at -5: past there loudness leaves tolerance on every take measured,
+ * and the honest answer is to refuse rather than publish something quiet.
  */
-export const AIM_LADDER = [SPEC.masterTruePeak, -2, -2.5, -3, -3.5, -4, -4.5, -5];
+export const AIM_LADDER = [
+  // 0.1 dB resolution through the region where both constraints are live.
+  -1.5, -1.6, -1.7, -1.8, -1.9,
+  -2.0, -2.1, -2.2, -2.3, -2.4,
+  -2.5, -2.6, -2.7, -2.8, -2.9, -3.0,
+  // Below here the peak has plenty of room and only loudness decides.
+  -3.5, -4.0, -4.5, -5.0,
+];
 
 /**
  * MASTER, THEN CHECK THE THING THAT SHIPS — and if the encoder spoiled it, aim

@@ -559,6 +559,33 @@ describe('the ladder tightens the aim and never the specification', () => {
     for (let i = 1; i < ladder.length; i += 1) expect(ladder[i]).toBeLessThan(ladder[i - 1]);
   });
 
+  it('steps finely enough not to jump over a working aim', () => {
+    // THE COST OF GETTING THIS WRONG, measured on a real take that was refused:
+    //
+    //     -1.5   +0.68 dBTP   peak fails
+    //     -1.6   -1.49 dBTP   PASS   <- never attempted
+    //     -1.7   -1.55 dBTP   PASS   <- never attempted
+    //     -1.8   -1.72 dBTP   PASS   <- never attempted
+    //     -1.9   loudness fails
+    //     -2.0   loudness fails, by 0.05 dB
+    //
+    // The ladder went -1.5 then -2.0 and stopped, with three passing aims
+    // between them. 0.1 dB of aim moved the encoded peak by 2.17 dB: the encoder
+    // is sharply non-linear near its threshold, so a coarse search over it is
+    // not a search. Two takes were regenerated before this was understood, and
+    // they were probably fine.
+    const ladder = run1<number[]>(emit('M.AIM_LADDER'));
+    const live = ladder.filter((a) => a >= -3);
+    for (let i = 1; i < live.length; i += 1) {
+      expect(Number((live[i - 1] - live[i]).toFixed(4))).toBeLessThanOrEqual(0.1);
+    }
+  });
+
+  it('covers the region where both constraints are live', () => {
+    const ladder = run1<number[]>(emit('M.AIM_LADDER'));
+    for (const aim of [-1.6, -1.7, -1.8, -1.9, -2.0]) expect(ladder).toContain(aim);
+  });
+
   it('it stops before loudness would fall out of tolerance', () => {
     // Measured on the real source shape: the aim survives to about -5 and then
     // integrated loudness drops below -17. Past that the two requirements

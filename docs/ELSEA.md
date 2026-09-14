@@ -48,13 +48,13 @@ Last updated: 2026-09-09.
 | Lint | clean |
 | Migrations | 18 written, **all applied** |
 | Edge functions | all four deployed and current — marker `8126ffda` |
-| Modules | **6 of 47** authored, content-approved and playable |
-| Audio | **18 renditions, all approved** — 6 modules x warm, clear, bright, at 0.92x |
-| Recipes | **1 of 5 composable** (`nervous_ready`). Four families empty |
+| Modules | **8 of 47** authored, content-approved and playable |
+| Audio | **24 renditions, all approved** — 8 modules x warm, clear, bright, at 0.92x |
+| Recipes | **2 of 5 composable** (`nervous_ready`, `flat_go`) |
 | Voices | `warm` (default), `clear`, `bright` all selectable. 7 more catalogued, unmapped |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content** |
 | Commercial | entitlement schema live; **RevenueCat absent, no purchase possible** |
-| Blocking | 4 modules for the remaining recipes; **nothing has been heard on a device** |
+| Blocking | `settle` and `ground`/`release`; **nothing has been heard on a device** |
 
 **As of 2026-09-14 the product composes a real session.** Free text enters the
 safety gate, `nervous_ready` composes at all four durations from six approved
@@ -2221,13 +2221,67 @@ Voices selectable          3/10
 and novelty and replay are unexercised. The chain is proven from free text to a
 persisted manifest with signed URLs, and stops there.
 
+## 6v. The mastering ladder was stepping over working aims
+
+2026-09-14, found on the third failure of the same shape.
+
+Three takes had been refused by the mastering loop and regenerated. Two were
+written up as take variance — ElevenLabs re-phrases on every render, so a
+regenerated take passing looked like confirmation. All three were Clear.
+
+The third one was measured properly instead:
+
+```
+aim    encoded LUFS   encoded dBTP
+-1.5      -16.82         +0.68     peak fails
+-1.6      -16.87         -1.49     PASS     <- never attempted
+-1.7      -16.91         -1.55     PASS     <- never attempted
+-1.8      -16.96         -1.72     PASS     <- never attempted
+-1.9      -17.01         -1.79     loudness fails
+-2.0      -17.05         -1.87     loudness fails, by 0.05 dB
+```
+
+The ladder went -1.5, then -2.0, and stopped. **Three passing aims sat between
+the two it tried.**
+
+### Why 0.5 dB steps were never going to work
+
+**0.1 dB of aim moved the encoded peak by 2.17 dB.** The encoder is sharply
+non-linear near its threshold, so a coarse search across it is not a search at
+all — it is two samples either side of a cliff.
+
+Tightening the aim also costs loudness, slowly and steadily. So the two
+constraints close on each other from opposite directions and the usable window
+can be a few tenths of a decibel wide. A 0.5 dB step is wider than the window.
+
+The ladder now runs at 0.1 dB from -1.5 to -3.0, and coarsely below that, where
+the peak has long since cleared and only loudness is still deciding.
+
+The same staged Clear take then passed on the second rung, with no regeneration
+and no provider call.
+
+### What this says about the earlier "bad takes"
+
+`nr_regulate_short`/clear and `focus_narrow_short`/clear were both regenerated on
+the belief that the take was at fault. **They were probably fine.** Two provider
+calls were spent on what was a search-resolution problem, and the diagnosis was
+recorded in §6t and §6u with more confidence than it had earned.
+
+The pattern worth carrying: a failure that goes away on retry is not thereby
+explained. Regeneration changes the input, which hides a fault in the process
+behind a plausible story about variance.
+
+Clear failing all three times is consistent with it rendering quieter than warm
+and bright — it needs more gain, so it sits harder against both constraints and
+finds the narrow window first.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
 
-- **Four of five recipes do not compose.** `nervous_ready` does (§6u). The rest
-  need `activate`, `ground` or `release`, `settle` and `sleep` — four more
-  modules at minimum. See §8c.
+- **Three of five recipes do not compose.** `nervous_ready` and `flat_go` do.
+  The rest need `settle` (blocks two recipes, two phases each) and `ground` or
+  `release`. Two more modules at minimum. See §8c.
 - **No session has ever been heard.** Composition and persistence are proven;
   device playback, outcome capture, novelty and replay are not.
 - **Manifest persistence is atomic but still unexercised.** It now writes

@@ -1,0 +1,15 @@
+[
+  {
+    "module_key": "activate_wake_short",
+    "family": "activate",
+    "technique_key": "gentle_physical_activation",
+    "storage_path": "modules/activate/activate_wake_short.m4a",
+    "duration_seconds": 36,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "Wake the body up a little. Nothing strenuous. Sit up, or stand, and let your spine lengthen. Roll your shoulders back \u2014 slowly, once. And again. Take a fuller breath than you have been taking, and let it out easily. If it feels right, stretch your arms out, or above you. Shake out your hands. Notice there is a little more warmth, a little more readiness, than there was a minute ago. Movement first. The rest tends to follow.",
+    "content_approved": true
+  }
+]
