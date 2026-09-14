@@ -8,8 +8,7 @@ almost no content for it to play.** Five of forty-seven modules are authored, no
 module is playable, and every session today falls back to silence. Nothing in the
 commercial layer changes that, and no amount of it can.
 
-Last updated at `d276475`. Live figures read from `alignex-consumer-dev`
-on 2026-09-14 with `npm run coverage`.
+Last updated 2026-09-14. Live figures read from `alignex-consumer-dev`.
 
 ---
 
@@ -106,7 +105,7 @@ store.**
 |---|---|---|---|---|---|
 | 1 | `warm` | Warm | yes (default) | yes | 1 approved rendition |
 | 2 | `clear` | Clear | yes | yes | 1 approved rendition |
-| 3 | `bright` | Bright | **no** | yes | rendition exists, **not approved** |
+| 3 | `bright` | Bright | **no** | yes | 1 approved rendition |
 | 4 | `grounded` | Grounded | no | no | none |
 | 5 | `gentle` | Gentle | no | no | none |
 | 6 | `direct` | Direct | no | no | none |
@@ -126,14 +125,14 @@ mapping, so none of the seven can become selectable by accident. That exact
 mistake was made once before, when `bright` was inserted active before any
 mapping existed.
 
-**`bright` is verified, and it is not approved.** Read from the live database:
-the rendition exists at 11s and `approved` is `false`. The product owner has said
-it sounds good, but that remark is not an approval record, and it should not be
-made one from a line in a specification.
+**`bright` is approved and still not selectable, which is correct.** The
+rendition was approved on 2026-09-14 on the product owner's instruction, having
+been listened to. `is_active` remains `false`.
 
-Even once approved, it must not be activated on the strength of one rendition:
-activation requires audio coverage across the launch catalogue, which does not
-exist for any voice.
+Approving a rendition is not activating a voice. Activation requires audio
+coverage across the launch catalogue, and `bright` has one module of forty-seven —
+the same as `warm` and `clear`. Selecting it today would mean a voice that can
+speak one line of one session.
 
 ---
 
@@ -168,7 +167,7 @@ created or approved by me.
 | Planned | **47** |
 | Authored (English) | **5** |
 | Content-approved (English) | **5** |
-| With any approved audio | **1** (`nr_arrive_short`, in warm and clear) |
+| With any approved audio | **1** (`nr_arrive_short`, in all three voices) |
 | Playable modules | **0** |
 
 The five are the `nervous_ready` tranche: `nr_arrive_short`,
@@ -185,9 +184,15 @@ interventions need authoring and human wellbeing approval. I must not write them
 
 ## H. Audio coverage
 
-One module — `nr_arrive_short` — has masters, in all three mapped voices. Warm
-(13s) and Clear (12s) are approved; Bright (11s) is not. Three renditions exist in
-the entire database.
+One module — `nr_arrive_short` — has masters in all three mapped voices, and all
+three are now human-approved: Warm 13s, Clear 12s, Bright 11s. Those are the only
+three renditions in the entire database.
+
+**No module is playable.** `intervention_modules.approved` is `false` for all
+five, so the composer selects none of them. Module approval is a separate gate
+from audio approval and should stay shut until the other four load-bearing
+modules exist — approving `nr_arrive_short` alone would produce a five-minute
+session that fails with `phase_unfilled`.
 
 **Four of the five load-bearing modules have no audio in any voice.** Removing any
 one of those five makes a five-minute session fail with `phase_unfilled`, so the
@@ -309,7 +314,8 @@ none.
 - **42 intervention scripts** — authoring and wellbeing approval.
 - **Technique keys** for the existing five — proposed, none confirmed.
 - **Seven provider voices** — selection.
-- **Audio approval** for every rendition, by listening.
+- **Audio approval** for every rendition, by listening. *(Done for all three
+  renditions of `nr_arrive_short`.)*
 - **0.88× pacing** — approval after hearing the test.
 - **Translated content** for four locales, by human translators and reviewers.
 - **Crisis resources** per jurisdiction.

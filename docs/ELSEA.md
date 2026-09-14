@@ -1724,14 +1724,15 @@ was read from the live project `alignex-consumer-dev` with `npm run coverage`.
 ### What is actually there
 
 ```
-module          voice    locale  version  approved  duration
-nr_arrive_short warm     en      1        TRUE      13s
-nr_arrive_short clear    en      1        TRUE      12s
-nr_arrive_short bright   en      1        false     11s
+module          voice    locale  version  approved  approved_at   duration
+nr_arrive_short warm     en      1        TRUE      2026-09-11    13s
+nr_arrive_short clear    en      1        TRUE      2026-09-12    12s
+nr_arrive_short bright   en      1        TRUE      2026-09-14    11s
 ```
 
-Three renditions, all of one module. **Warm and Clear are approved. Bright is
-not.**
+Three renditions, all of one module, **all three now human-approved.** Bright was
+approved on 2026-09-14 on the product owner's instruction, having been listened
+to. Exactly one row was updated.
 
 ### The correction
 
@@ -1746,9 +1747,13 @@ visible: it was a guess about state that one read-only query could have settled 
 any point. The lesson is the same one §6p keeps teaching — infer nothing that can
 be measured.
 
-**Bright needs a human decision, not a database fix.** The product owner has said
-it sounds good; the rendition exists and is unapproved. It should not be approved
-here on the strength of a remark in a specification.
+**Bright was approved by instruction, not by inference.** It had been described as
+sounding good in a specification, which is not an approval record; the approval was
+recorded only when the product owner asked for it directly.
+
+Approving a rendition is **not** activating a voice. `bright.is_active` remains
+`false`: one module of forty-seven is not coverage, and the trigger added in §6s
+would require the mapping check regardless.
 
 ### Nothing is playable
 
@@ -1756,13 +1761,20 @@ here on the strength of a remark in a specification.
 English content-approved       5/47
 English modules playable       0/47
 Locales content-ready          1/5
-Voices selectable              2/10
+Voices selectable              2/10   (warm, clear -- bright approved but inactive)
 Voices provider-mapped (en)    3/10
 ```
 
-`nr_arrive_short` has approved audio in two voices, but
-`intervention_modules.approved` is false for all five modules, so the composer
-selects none of them. Every session still runs on the silent catalogue fallback.
+`nr_arrive_short` now has approved audio in all three mapped voices, and **none of
+it plays.** `intervention_modules.approved` is `false` for all five modules, so the
+composer selects none of them and every session still runs on the silent catalogue
+fallback.
+
+That is the correct state, not an oversight. Module approval is a separate gate
+from audio approval: a module becomes playable when the product is willing to put
+it in front of somebody, which needs the other four load-bearing modules to exist
+first. Approving `nr_arrive_short` alone would produce a five-minute session that
+fails with `phase_unfilled`.
 
 Four of the five load-bearing modules have no audio at all: `nr_regulate_short`,
 `nr_reframe_short`, `nr_prepare_short`, `nr_close_short`. Removing any one of the
@@ -1771,14 +1783,21 @@ playable library is all five in at least one voice.
 
 ### A measurement that lied, caught in passing
 
-While reading the above, `@(Invoke-RestMethod ...).Count` reported **1 rendition**
-in the whole database, immediately after a filtered query had returned **3** for a
-single module. The count was a PowerShell artifact, not a fact, and it nearly went
-into this document as one. Printing the raw response settled it.
+`@(Invoke-RestMethod ...).Count` reported **1 rendition** in the whole database,
+immediately after a filtered query had returned **3** for a single module. A
+PowerShell artifact, not a fact, and it nearly went into this document as one.
 
-That is the third time in this project a check has confidently reported the wrong
-number. The habit that catches it is cheap: when two measurements disagree, print
-the raw response rather than picking the one that looks right.
+The same artifact appeared again while verifying the Bright approval: a count of
+modules with `approved = true` reported **1**, which would have meant a module had
+silently become playable. Printing the rows showed the filter returns **zero** —
+all five modules are `approved: false`.
+
+So: `.Count` on an `Invoke-RestMethod` result is not a row count in this shell,
+and must not be used as one. Print the rows, or read `Content-Range` with
+`Prefer: count=exact`. When two measurements disagree, print the raw response
+rather than picking the one that looks right — that habit has now caught two
+wrong numbers in a single sitting, one of which would have been recorded as a
+product state change that never happened.
 
 ## 6r. Delivery pace — slowing the cast voices
 
