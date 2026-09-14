@@ -38,22 +38,36 @@ Last updated: 2026-09-09.
 
 ## 1. Status at a glance
 
+*Read from the live project `alignex-consumer-dev`, 2026-09-14.*
+
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 742 passing across 24 suites |
-| TypeScript | clean |
+| Tests | 774 passing across 25 suites |
+| TypeScript | clean (app and functions) |
 | Lint | clean |
-| Migrations | 16 written, **all applied** |
-| Edge functions | `interpret`, `compose`, `voice-check`, `generate-master` deployed and current |
-| Deployment parity | current — marker `14b7dc42`; `generate-master` deployed 2026-09-10 |
-| Audio content | first masters exist — see §6q. **No module is playable yet.** |
-| Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content exists** |
-| Voices | `warm` and `clear` active; `bright` exists but is **not mapped or selectable** |
-| Blocking | recorded voice masters. Scripts approved; provider wired but never called live. |
+| Migrations | 18 written, **all applied** |
+| Edge functions | all four deployed and current — marker `8126ffda` |
+| Modules | **6 of 47** authored, content-approved and playable |
+| Audio | **18 renditions, all approved** — 6 modules x warm, clear, bright, at 0.92x |
+| Recipes | **1 of 5 composable** (`nervous_ready`). Four families empty |
+| Voices | `warm` (default), `clear`, `bright` all selectable. 7 more catalogued, unmapped |
+| Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content** |
+| Commercial | entitlement schema live; **RevenueCat absent, no purchase possible** |
+| Blocking | 4 modules for the remaining recipes; **nothing has been heard on a device** |
 
-**The product runs end to end today** on the catalogue path, as a correctly
-timed session with no sound. The whole flow — safety gate, interpretation,
+**As of 2026-09-14 the product composes a real session.** Free text enters the
+safety gate, `nervous_ready` composes at all four durations from six approved
+modules, a manifest and its twelve segments persist atomically with a
+fingerprint, and every segment carries a short-lived signed URL to approved
+audio. See §6u.
+
+**Nobody has heard it.** Device playback, outcome capture, novelty and replay are
+all unexercised, and four of five recipes still cannot be filled. The older
+description below — of a correctly timed session with no sound — remains true for
+every recipe except `nervous_ready`.
+
+The whole flow — safety gate, interpretation,
 target and time, playback, pause, early exit, outcome — is genuinely
 exercisable.
 
@@ -379,7 +393,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 742 across 24 suites
+### Tests — 774 across 25 suites
 
 | Suite | Covers |
 |---|---|
@@ -400,6 +414,7 @@ All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 | `spatial-audio.test.ts` | The sound layer: duration is untouchable, every layer stops together, absent assets degrade to voice-only, and no claim is made. |
 | `mastering.test.ts` | The mastering stage, run for real through ffmpeg: a take above the true-peak ceiling is brought onto the specification, and the specification itself did not move. |
 | `delivery-pace.test.ts` | Provider speaking pace: asking for nothing changes nothing, an unsupported pace fails before the call, and a pacing test cannot reach a production path. |
+| `entitlement.test.ts` | The commercial gate: three free sessions server-side, reinstall-proof, and not consumed by a failure nobody caused. |
 
 ---
 
@@ -1716,10 +1731,15 @@ Clear is ready to re-master from the existing staged file, with no regeneration:
 node scripts/finalise-master.mjs --module nr_arrive_short --locale en --voice clear --commit
 ```
 
-## 6q. Live audio state — read from the database, 2026-09-14
+## 6q. Live audio state — read from the database, 2026-09-14 (superseded)
 
-Previously this section carried an inference. It was wrong, and what replaces it
-was read from the live project `alignex-consumer-dev` with `npm run coverage`.
+**Superseded by §6t and §6u the same day.** Kept because the correction it records
+is worth reading: this section previously carried an inference about Warm's
+approval that was wrong. The figures below were true at the time and were then
+overtaken by the production run.
+
+What replaces the inference was read from the live project with
+`npm run coverage`.
 
 ### What is actually there
 
@@ -2455,6 +2475,36 @@ node scripts/modules-import.mjs FILE    # dry run; needs a flag to write
 node scripts/generate-sound-assets.mjs  # rebuild the sound layer
 ```
 
+Reading the live database (all read-only, all need `SUPABASE_SERVICE_ROLE_KEY`):
+
+```bash
+npm run coverage                        # locale x voice x module, what is approved
+npm run recipes                         # which recipes can actually be composed
+npm run inspect:staged -- --module K --locale en --voice warm
+                                        # forensics on one staged provider render
+```
+
+**`npm run recipes` is the one to run after any content change.** Filling phases
+is a matching problem, not a coverage one — a module plays at most once per
+session, so a recipe can have a module in every family it names and still fail.
+`npm run coverage` will not tell you that; this will.
+
+Producing audio for an approved module, one module and one voice at a time:
+
+```bash
+# generate -> staging (this is where money is spent)
+curl -X POST "$URL/functions/v1/generate-master"   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"   -H "Content-Type: application/json"   -d '{"module_key":"KEY","locale":"en","voice_profile":"warm"}'
+
+# master, measure the encoded AAC, write the rendition unapproved
+node scripts/finalise-master.mjs --module KEY --locale en --voice warm --commit
+
+# pacing experiment instead: isolated paths, no rendition row, approved master safe
+node scripts/finalise-master.mjs --module KEY --locale en --voice warm --speed 0.88 --commit
+```
+
+Approval is always a separate, human step, and there are three of them: content
+wording, audio rendition, and module playability. None implies another (§6n).
+
 Notes for whoever picks this up:
 
 - **Read the versioned Expo docs** at `https://docs.expo.dev/versions/v57.0.0/`
@@ -2462,6 +2512,16 @@ Notes for whoever picks this up:
   - **React Compiler is enabled.** Do not read refs during render, and do not
     mutate values returned by hooks. Both are lint errors, and both are real.
   - **Never edit an applied migration.** Add a new one.
+  - **A gate must not ask for something only the gated step can produce.** This
+    has now been built wrong three times: content approval derived from module
+    playability (§6n), operator auth compared against a secret instead of a claim
+    (§6m), and voice generation refusing a profile that was not yet selectable
+    (§6t). Each time a test had locked the defect in. When adding a gate, check
+    what has to be true *before* the thing it guards can ever run.
+  - **`.Count` on an `Invoke-RestMethod` result is not a row count** in the
+    PowerShell used here. It reported 1 rendition when there were 3, 1 playable
+    module when there were none, and 1 manifest segment when there were 12. Print
+    the rows, or read `Content-Range` with `Prefer: count=exact` (§6q).
   - **Redeploy after touching `supabase/functions/`, including `_shared/`.**
     A change to shared code is a change to every function that imports it, and
     nothing will tell you the deployed copy is stale.

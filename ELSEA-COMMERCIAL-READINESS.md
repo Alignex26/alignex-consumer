@@ -3,11 +3,11 @@
 **Status: NOT release ready.** This document is written to be trusted, which
 means it says what is missing at least as clearly as what is built.
 
-The honest summary in one line: **the engine is real, the first five modules are
-live with approved audio in three voices, and no recipe can yet be composed from
-them.** A module plays at most once per session, so five modules cannot fill six
-or seven phases — 0/5 recipes compose. Roughly 8–10 more modules fixes that.
-Nothing in the commercial layer changes it, and no amount of it can.
+The honest summary in one line: **one recipe composes a real session end to end,
+four do not, and nobody has heard any of it.** Six modules are live with approved
+audio in three voices; `nervous_ready` composes, persists and fingerprints
+correctly. Four more modules make the remaining recipes composable. Nothing in
+the commercial layer changes that, and no amount of it can.
 
 Last updated 2026-09-14, after the launch-tranche production run. Live figures
 read from `alignex-consumer-dev` with `npm run coverage` and `npm run recipes`.
@@ -317,8 +317,12 @@ none.
 
 ## P. Known gaps
 
-1. **0 of 5 recipes compose** — needs ~8–10 more modules, not 42.
-2. 42 of 47 modules unauthored; every session still falls back to silence.
+1. **4 of 5 recipes do not compose** — needs 4 more modules (`activate`,
+   `ground`/`release`, `settle`, `sleep`).
+2. **No session has been heard on a device.** Composition, persistence and
+   fingerprinting are proven; playback, outcome capture, novelty and replay are
+   not.
+3. 41 of 47 modules unauthored.
 3. RevenueCat absent — no purchase possible.
 4. Paywall UX is a 61-line placeholder.
 5. Batch production tooling not built.
