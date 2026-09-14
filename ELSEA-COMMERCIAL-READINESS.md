@@ -166,11 +166,11 @@ created or approved by me.
 | | |
 |---|---|
 | Planned | **47** |
-| Authored (English) | **5** |
-| Content-approved (English) | **5** |
-| With any approved audio | **5** — all of them, in all three voices |
-| Playable modules | **5** |
-| **Recipes composable** | **0 of 5** |
+| Authored (English) | **6** |
+| Content-approved (English) | **6** |
+| With any approved audio | **6** — all of them, in all three voices |
+| Playable modules | **6** |
+| **Recipes composable** | **1 of 5** — `nervous_ready` |
 
 The five are the `nervous_ready` tranche: `nr_arrive_short`,
 `nr_regulate_short`, `nr_reframe_short`, `nr_prepare_short`, `nr_close_short` —
@@ -179,15 +179,15 @@ one each in `orient`, `regulate`, `reframe`, `prepare`, `close`.
 **Seven of the twelve families have nothing authored at all:** `ground`,
 `release`, `focus`, `activate`, `transition`, `settle`, `sleep`.
 
-**The release blocker is now precise: 0 of 5 recipes compose.** A module plays at
+**The release blocker is now precise: 4 of 5 recipes do not compose.** A module plays at
 most once per session, so five modules cannot fill six or seven phases, and
 several phases name families with nothing in them at all. `npm run recipes`
 reports it per phase.
 
-Roughly **8–10 more modules** makes all five recipes composable — not the 42 that
-"47 minus 5" implies. In leverage order: `ground` (4 blocked phases), `settle`
-(3), `focus` (unblocks `nervous_ready` outright), `activate` (`flat_go` needs
-two), then `release`, `sleep`, `transition`.
+`focus_narrow_short` took it from 0/5 to 1/5 and halved two more gaps. Four
+families remain empty: `activate` (unblocks `flat_go`), `ground` or `release`
+(`scattered_focused`), `settle` and `sleep` (`wired_sleep`, `wound_up_home`).
+**Four more modules at minimum.**
 
 This is authoring and human wellbeing approval. I must not write them.
 
@@ -231,10 +231,13 @@ manifest persistence.
 worked against the real service: free text in, `nervous_ready` / 600s /
 `pre_meeting` out, raw text never leaving the server.
 
-**Composition then failed, correctly**, with `phase_unfilled` at all four
-durations — see §G. The allocator refused to repeat content or silently shorten
-the session, which is the specified behaviour. No manifest has yet been persisted
-and no audio has played on a device.
+**Composition, persistence and fingerprinting are now proven** (§6u). All four
+durations compose for `nervous_ready`; a manifest and its twelve segments were
+written atomically and read back intact, with a fingerprint carrying recipe plus
+ordered module identities and versions.
+
+**No audio has played on a device**, no outcome has been recorded, and novelty
+and replay remain unexercised.
 
 ---
 
@@ -362,11 +365,15 @@ Ordered by what unblocks the most:
 
 ## S. Exact next action
 
-**Author one `focus` module.**
+**Play `nervous_ready` on a device.**
 
-It unblocks `nervous_ready` outright — one module, one composable recipe, and the
-first time ELSEA plays a real session end to end. Then `ground` and `settle`,
-which between them unblock the remaining four recipes faster than anything else.
+Everything up to the device is proven: free text, safety gate, interpretation,
+composition, persistence, fingerprint, signed URLs. Nobody has heard it, and that
+is where the next real surprises are — timing, the sound layer, and 35-second
+silences that look fine in a table.
+
+Then `activate`, `ground`/`release`, `settle` and `sleep` — four modules to make
+the remaining recipes compose.
 
 Everything downstream is built and exercised: import, generate, master, approve,
 activate. Run `npm run recipes` after each module lands to see the blocked-phase

@@ -1,0 +1,15 @@
+[
+  {
+    "module_key": "focus_narrow_short",
+    "family": "focus",
+    "technique_key": "attentional_narrowing",
+    "storage_path": "modules/focus/focus_narrow_short.m4a",
+    "duration_seconds": 28,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "There is probably more than one thing pulling at you. You don't have to hold all of it at once. Choose one thing to put your attention on \u2014 just one. Let the rest wait. It will still be there. If your attention slides off, that's normal. Bring it back, without making it a problem. One thing, for now.",
+    "content_approved": true
+  }
+]

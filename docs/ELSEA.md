@@ -2079,16 +2079,137 @@ the trigger permitted it, which confirms its provider mapping is live.
 and 0/5 recipes can be filled. The "NO MODULE IS PLAYABLE" blocker is gone and
 has been replaced by a more precise one.
 
+## 6u. The first real session — composed, persisted, never heard
+
+2026-09-14. `nervous_ready` composes, and a manifest has been written to the
+database for the first time.
+
+### One module did it
+
+`focus_narrow_short` — drafted here, approved by the product owner, imported,
+generated in three voices at 0.92x and approved. It took recipe readiness from
+**0/5 to 1/5**, and halved the gaps in two more:
+
+```
+before                              after
+flat_go            2 blocked   ->   1 blocked
+nervous_ready      1 blocked   ->   COMPOSABLE
+scattered_focused  2 blocked   ->   1 blocked
+wired_sleep        2 blocked   ->   2 blocked
+wound_up_home      2 blocked   ->   2 blocked
+```
+
+Four families still have nothing: `activate`, `ground`/`release`, `settle`,
+`sleep`.
+
+### The composition
+
+All four durations compose. The 300s session, twelve segments:
+
+```
+  0s  nr_arrive_short     21s   arrive
+ 21s  silence              1s
+ 22s  nr_regulate_short   45s   regulate_arousal
+ 67s  silence             26s
+ 93s  nr_reframe_short    40s   reframe_energy
+133s  silence             14s
+147s  nr_prepare_short    45s   build_readiness
+192s  silence             35s
+227s  focus_narrow_short  28s   direct_attention_forward
+255s  silence             29s
+284s  nr_close_short      11s   close
+295s  silence              5s
+```
+
+Every phase filled, no module repeated, signed URLs to real approved audio,
+landing exactly on 300s.
+
+**The silences are long and uneven** — 190s of speech in a 300s session, with
+gaps up to 35s. That is the allocator distributing slack, and with one module per
+phase it has nothing else to do with the time. Whether that reads as spacious or
+abandoned is a listening question, and it should shrink as inventory grows.
+
+### Persistence and the fingerprint
+
+```
+manifest_id  c8531bbd-0f32-4b9b-bc72-5d3b754ca992
+fingerprint  nervous_ready|1bb77c18@1,5256c995@1,289074f5@1,
+                           0dda78a3@1,46a4bb5e@1,0d242861@1
+```
+
+Recipe plus six ordered module identities with content versions. No signed URLs,
+no offsets, no silence, no provider ids — so it stays stable while URLs rotate
+every two hours. Novelty and replay now have what they need, though neither has
+been exercised.
+
+### A fingerprint gap that was not one
+
+This was recorded as "a real defect" on the strength of one null field, and it
+was not a defect at all. `compose` computes and persists the fingerprint itself;
+it skips persistence when there is no user (`if (!userId) return null`), and the
+first call had used the service-role key, which carries no `sub`. The null came
+from the test method, not the product.
+
+The mistake worth naming: a conclusion was drawn from one observation without
+reading the code path that produced it, and a manual RPC call was then used to
+"prove" persistence while bypassing the code being tested. That manual call also
+wrote a manifest with a null fingerprint that the product would never produce.
+
+Composed as a real user, it behaves correctly and always did.
+
+### What the run needed on the way
+
+**A hardcoded ceiling map blocked the sixth module.** `finalise-master` held a
+literal map of the five original module keys and refused anything else with
+`Unknown module` — hit immediately by the first new module, after it had been
+authored, approved and imported correctly.
+
+Ceilings are now derived for any module without an explicit entry: the smallest
+`min_seconds` of any phase accepting its family, which guarantees it fits every
+slot it could be selected for. `focus` derives 30s.
+
+**The existing five were NOT recomputed.** The recipe data does not reproduce
+them — `reframe` is 40 agreed against 30 derived, `orient` 21 against 20 — so
+they are product decisions rather than a formula, and deriving them would have
+silently retightened approved content. Regression-checked.
+
+**One take needed regenerating, and failed in a new way.** `focus_narrow_short`
+in clear showed a NON-MONOTONIC encoder response:
+
+```
+aim -1.5  ->  +0.61 dBTP
+aim -2.0  ->  +1.09 dBTP    worse
+aim -2.5  ->  -0.64 dBTP    still over, loudness now out
+```
+
+The ladder in §6p assumes a lower aim yields a lower encoded peak. That held
+everywhere else and not here. It stopped correctly rather than publish something
+quiet, and a regenerated take passed first attempt — but the assumption is now
+known to be only mostly true. Second Clear take to need regenerating; both were
+Clear, which may be coincidence at n=2.
+
+### State
+
+```
+English content-approved   6/47
+English modules playable   6/47
+Recipes composable         1/5
+Voices selectable          3/10
+```
+
+**Never heard.** No audio has played on a device, no outcome has been recorded,
+and novelty and replay are unexercised. The chain is proven from free text to a
+persisted manifest with signed URLs, and stops there.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
 
-- **No recipe composes.** All five modules are approved with audio in three
-  voices (§6t), but 0/5 recipes can fill their phases: a module plays at most
-  once per session, and several phases compete for the only `prepare` module or
-  name families with nothing in them at all. Roughly 8–10 more modules fixes
-  this; see §8c for the order. Every session still runs on the catalogue
-  fallback, silent, which the UI states. This remains the blocker.
+- **Four of five recipes do not compose.** `nervous_ready` does (§6u). The rest
+  need `activate`, `ground` or `release`, `settle` and `sleep` — four more
+  modules at minimum. See §8c.
+- **No session has ever been heard.** Composition and persistence are proven;
+  device playback, outcome capture, novelty and replay are not.
 - **Manifest persistence is atomic but still unexercised.** It now writes
   through a `security definer` RPC so a manifest and its segments land
   together or not at all. The rows are checked against the real schema

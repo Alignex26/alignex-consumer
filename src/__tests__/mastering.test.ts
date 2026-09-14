@@ -745,6 +745,60 @@ describe('re-mastering costs no provider call', () => {
   });
 });
 
+describe('the duration ceiling scales past the first five modules', () => {
+  it('no longer refuses a module it has never heard of', () => {
+    // The ceilings were a hardcoded map of exactly the five original module
+    // keys. The SIXTH module in a 47-module catalogue hit it immediately:
+    // authored, approved and imported correctly, then rejected with
+    // `Unknown module`. A list of five keys cannot carry the library.
+    expect(FINALISE).not.toContain('Unknown module "${moduleKey}"');
+    expect(FINALISE).toContain('async function ceilingFor(');
+  });
+
+  it('keeps the five agreed ceilings exactly as agreed', () => {
+    // These are product decisions and do NOT match any formula: `reframe` is 40
+    // where the tightest accepting phase allows 30, and `orient` is 21 where the
+    // tightest allows 20. Deriving them would silently retighten `reframe` by
+    // ten seconds on content already approved at 40.
+    const block = FINALISE.slice(FINALISE.indexOf('const CEILINGS = {'));
+    for (const [key, seconds] of [
+      ['nr_arrive_short', 21], ['nr_regulate_short', 45], ['nr_reframe_short', 40],
+      ['nr_prepare_short', 45], ['nr_close_short', 11],
+    ] as const) {
+      expect(block).toContain(`${key}: ${seconds}`);
+    }
+  });
+
+  it('an explicit entry always wins over the derived value', () => {
+    const fn = FINALISE.slice(FINALISE.indexOf('async function ceilingFor('));
+    expect(fn.slice(0, 200)).toContain('if (key in CEILINGS) return CEILINGS[key]');
+  });
+
+  it('derives from the tightest slot the family has to serve', () => {
+    // A phase is only guaranteed its minimum allocation, so a module at or under
+    // the smallest `min_seconds` of any accepting phase fits every slot it could
+    // be selected for. A looser ceiling would admit a module that then cannot be
+    // placed in the tightest recipe — a failure only discovered when a session
+    // refuses to compose.
+    const fn = FINALISE.slice(FINALISE.indexOf('async function ceilingFor('));
+    expect(fn).toContain('recipe_phase_families?family=eq.');
+    expect(fn).toContain('min_seconds');
+    expect(fn).toContain('Math.min(...mins)');
+  });
+
+  it('refuses rather than guesses when no phase accepts the family', () => {
+    const fn = FINALISE.slice(FINALISE.indexOf('async function ceilingFor('));
+    expect(fn).toContain('No recipe phase accepts the');
+    expect(fn).toContain('process.exit(2)');
+  });
+
+  it('the ceiling is still enforced, not merely computed', () => {
+    const lib = readFileSync(join(root, 'scripts', 'lib', 'mastering.mjs'), 'utf8');
+    expect(lib).toContain('over ceiling by');
+    expect(FINALISE).toContain('await ceilingFor(moduleKey, moduleFamily)');
+  });
+});
+
 describe('one module, one locale, one voice — Warm is not touched', () => {
   it('operates on exactly the voice named on the command line', () => {
     expect(FINALISE).toContain("pick('--voice')");

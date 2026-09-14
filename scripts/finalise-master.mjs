@@ -60,7 +60,18 @@ const pacing = speed !== null;
 
 const BUCKET = 'intervention-audio';
 
-/** From the approved manifest. Hard, and a property of the recipe. */
+/**
+ * Duration ceilings for the first tranche.
+ *
+ * THESE ARE PRODUCT DECISIONS AND ARE NOT DERIVED. They were chosen per module
+ * against the tightest slot each family has to serve, and they do not match any
+ * formula: `reframe` is 40 where the tightest accepting phase allows 30, and
+ * `orient` is 21 where the tightest allows 20. Recomputing them would silently
+ * retighten `reframe` by ten seconds on content already approved at 40.
+ *
+ * So they stay exactly as agreed. Anything NOT listed here gets a ceiling
+ * derived from the recipes instead — see `ceilingFor`.
+ */
 const CEILINGS = {
   nr_arrive_short: 21,
   nr_regulate_short: 45,
@@ -78,10 +89,7 @@ if (!moduleKey || !voice) {
   process.exit(2);
 }
 
-if (!(moduleKey in CEILINGS)) {
-  console.error(`\n  Unknown module "${moduleKey}".\n`);
-  process.exit(2);
-}
+
 
 const ok = (b) => spawnSync(b, ['-version'], { stdio: 'ignore' }).status === 0;
 if (!ok('ffmpeg') || !ok('ffprobe')) {
@@ -123,7 +131,7 @@ console.log(`\n  ${commit ? 'FINALISE' : 'DRY RUN'} — ${moduleKey} / ${locale}
 
 // --- the approved version --------------------------------------------------
 const moduleResult = await rest(
-  `/rest/v1/intervention_modules?module_key=eq.${encodeURIComponent(moduleKey)}&select=id`
+  `/rest/v1/intervention_modules?module_key=eq.${encodeURIComponent(moduleKey)}&select=id,family`
 );
 const modules = moduleResult.ok ? JSON.parse(moduleResult.body) : [];
 if (modules.length === 0) {
@@ -131,6 +139,7 @@ if (modules.length === 0) {
   process.exit(1);
 }
 const moduleId = modules[0].id;
+const moduleFamily = modules[0].family;
 
 const versionResult = await rest(
   `/rest/v1/intervention_module_versions` +
@@ -158,6 +167,57 @@ if (version.approved_at === null) {
 
 const speedTag = pacing ? String(speed).replace('.', '_') : null;
 
+/**
+ * What ceiling applies to a module with no explicit entry.
+ *
+ * THE HARDCODED MAP DID NOT SCALE, and it failed the first time it was asked to:
+ * the sixth module in the library was refused with `Unknown module`, having been
+ * authored, approved and imported correctly. A list of five module keys cannot
+ * carry a 47-module catalogue.
+ *
+ * The derived value is the SMALLEST `min_seconds` of any phase that accepts the
+ * module's family. That is deliberately conservative: a phase is only guaranteed
+ * its minimum allocation, so a module at or under that fits every slot it could
+ * ever be selected for. A looser ceiling would let a module through that then
+ * cannot be placed in the tightest recipe — which is the failure that is
+ * expensive, because it is only discovered when a session refuses to compose.
+ *
+ * Fails rather than guesses if no phase accepts the family at all.
+ */
+async function ceilingFor(key, family) {
+  if (key in CEILINGS) return CEILINGS[key];
+
+  const familiesResult = await rest(
+    `/rest/v1/recipe_phase_families?family=eq.${encodeURIComponent(family)}&select=transition_key,phase`
+  );
+  const accepting = familiesResult.ok ? JSON.parse(familiesResult.body) : [];
+
+  if (accepting.length === 0) {
+    console.error(
+      `\n  No recipe phase accepts the "${family}" family, so there is no ceiling to\n` +
+      `  hold this module to. Nothing was written.\n`
+    );
+    process.exit(2);
+  }
+
+  const phasesResult = await rest(
+    `/rest/v1/recipe_phases?select=transition_key,phase,min_seconds`
+  );
+  const phases = phasesResult.ok ? JSON.parse(phasesResult.body) : [];
+
+  const mins = accepting
+    .map((a) => phases.find((p) => p.transition_key === a.transition_key && p.phase === a.phase))
+    .filter(Boolean)
+    .map((p) => Number(p.min_seconds));
+
+  if (mins.length === 0) {
+    console.error(`\n  Could not read phase durations for "${family}". Nothing was written.\n`);
+    process.exit(2);
+  }
+
+  return Math.min(...mins);
+}
+
 const staging = pacing
   ? `staging/pacing/${locale}/${voice}/${moduleKey}.v${version.version}.s${speedTag}.mp3`
   : `staging/${locale}/${voice}/${moduleKey}.v${version.version}.mp3`;
@@ -165,7 +225,7 @@ const staging = pacing
 const masterPath = pacing
   ? `pacing/${locale}/${voice}/${moduleKey}.s${speedTag}.m4a`
   : `modules/${locale}/${voice}/${moduleKey}.m4a`;
-const ceiling = CEILINGS[moduleKey];
+const ceiling = await ceilingFor(moduleKey, moduleFamily);
 
 if (pacing) {
   console.log(`  PACING TEST    speed ${speed} — no rendition row will be written,`);
