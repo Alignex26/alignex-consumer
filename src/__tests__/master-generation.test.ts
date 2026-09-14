@@ -106,8 +106,31 @@ describe('the provider voice is resolved server-side', () => {
     expect(GENERATOR).not.toContain('defaultVoice');
   });
 
-  it('an inactive profile is refused', () => {
-    expect(GENERATOR).toContain('return fail("voice_profile_unavailable")');
+  it('generation does NOT require the voice to be customer-selectable', () => {
+    // This test used to assert the opposite, and in doing so locked in a
+    // circular gate: `voice_profiles.is_active` means "a customer may choose
+    // this voice", which cannot legitimately be true until approved audio
+    // exists in it. Refusing to generate for an inactive profile demanded the
+    // output of the step generation is the input to, and it blocked all five
+    // Bright masters in production.
+    //
+    // Same shape as `content_not_approved` -- see approval-separation.test.ts.
+    expect(GENERATOR).not.toContain('fail("voice_profile_unavailable")');
+    expect(GENERATOR).not.toContain('if (!profile.is_active)');
+    expect(GENERATOR).toContain('DELIBERATELY NOT GATED ON `is_active`');
+  });
+
+  it('but an unmapped voice is still refused', () => {
+    // What generation actually requires. Still fails closed.
+    expect(GENERATOR).toContain('if (!mapping) return fail("no_provider_mapping")');
+    expect(GENERATOR).toContain('.eq("is_active", true)');
+  });
+
+  it('and selectability is still gated elsewhere', () => {
+    // Generating audio for a voice does not make it choosable. The database
+    // refuses to activate a profile with no active provider mapping.
+    const migration = read('supabase', 'migrations', '20260913110000_ten_voice_profiles.sql');
+    expect(migration).toContain('cannot be activated: no active provider mapping exists');
   });
 
   it('the operator command needs no provider voice id', () => {

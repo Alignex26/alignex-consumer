@@ -3,12 +3,14 @@
 **Status: NOT release ready.** This document is written to be trusted, which
 means it says what is missing at least as clearly as what is built.
 
-The honest summary in one line: **the engine is real and proven, and there is
-almost no content for it to play.** Five of forty-seven modules are authored, no
-module is playable, and every session today falls back to silence. Nothing in the
-commercial layer changes that, and no amount of it can.
+The honest summary in one line: **the engine is real, the first five modules are
+live with approved audio in three voices, and no recipe can yet be composed from
+them.** A module plays at most once per session, so five modules cannot fill six
+or seven phases — 0/5 recipes compose. Roughly 8–10 more modules fixes that.
+Nothing in the commercial layer changes it, and no amount of it can.
 
-Last updated 2026-09-14. Live figures read from `alignex-consumer-dev`.
+Last updated 2026-09-14, after the launch-tranche production run. Live figures
+read from `alignex-consumer-dev` with `npm run coverage` and `npm run recipes`.
 
 ---
 
@@ -20,6 +22,7 @@ Last updated 2026-09-14. Live figures read from `alignex-consumer-dev`.
 | Tests | 766 passing across 25 suites |
 | TypeScript | clean (app and functions) |
 | Migrations | 18 written, **all applied** |
+| Live project | `alignex-consumer-dev` |
 | Edge functions | all four deployed and current at `f5d489f` |
 
 **Built and verified this pass**
@@ -103,9 +106,9 @@ store.**
 
 | # | Profile | Label | Active | Mapped | Audio |
 |---|---|---|---|---|---|
-| 1 | `warm` | Warm | yes (default) | yes | 1 approved rendition |
-| 2 | `clear` | Clear | yes | yes | 1 approved rendition |
-| 3 | `bright` | Bright | **no** | yes | 1 approved rendition |
+| 1 | `warm` | Warm | yes (default) | yes | 5 approved renditions |
+| 2 | `clear` | Clear | yes | yes | 5 approved renditions |
+| 3 | `bright` | Bright | yes | yes | 5 approved renditions |
 | 4 | `grounded` | Grounded | no | no | none |
 | 5 | `gentle` | Gentle | no | no | none |
 | 6 | `direct` | Direct | no | no | none |
@@ -114,7 +117,7 @@ store.**
 | 9 | `soft` | Soft | no | no | none |
 | 10 | `deep` | Deep | no | no | none |
 
-**Architecturally supported: 10/10. Provider-mapped: 3/10.**
+**Architecturally supported: 10/10. Provider-mapped: 3/10. Selectable: 3/10.**
 
 The seven unmapped profiles are catalogue entries with no provider mapping and
 `is_active = false`. Selecting the provider voices for them is a product decision
@@ -125,14 +128,12 @@ mapping, so none of the seven can become selectable by accident. That exact
 mistake was made once before, when `bright` was inserted active before any
 mapping existed.
 
-**`bright` is approved and still not selectable, which is correct.** The
-rendition was approved on 2026-09-14 on the product owner's instruction, having
-been listened to. `is_active` remains `false`.
+**`bright` is approved and activated.** All five modules were produced in it at
+0.92x, listened to, and approved on 2026-09-14; the database trigger permitted
+activation, which confirms its provider mapping is live.
 
-Approving a rendition is not activating a voice. Activation requires audio
-coverage across the launch catalogue, and `bright` has one module of forty-seven —
-the same as `warm` and `clear`. Selecting it today would mean a voice that can
-speak one line of one session.
+All three voices now have complete coverage of the launch tranche — 5/5 modules
+each, zero missing.
 
 ---
 
@@ -167,8 +168,9 @@ created or approved by me.
 | Planned | **47** |
 | Authored (English) | **5** |
 | Content-approved (English) | **5** |
-| With any approved audio | **1** (`nr_arrive_short`, in all three voices) |
-| Playable modules | **0** |
+| With any approved audio | **5** — all of them, in all three voices |
+| Playable modules | **5** |
+| **Recipes composable** | **0 of 5** |
 
 The five are the `nervous_ready` tranche: `nr_arrive_short`,
 `nr_regulate_short`, `nr_reframe_short`, `nr_prepare_short`, `nr_close_short` —
@@ -177,22 +179,36 @@ one each in `orient`, `regulate`, `reframe`, `prepare`, `close`.
 **Seven of the twelve families have nothing authored at all:** `ground`,
 `release`, `focus`, `activate`, `transition`, `settle`, `sleep`.
 
-This is the release blocker, and it is not an engineering task. Forty-two
-interventions need authoring and human wellbeing approval. I must not write them.
+**The release blocker is now precise: 0 of 5 recipes compose.** A module plays at
+most once per session, so five modules cannot fill six or seven phases, and
+several phases name families with nothing in them at all. `npm run recipes`
+reports it per phase.
+
+Roughly **8–10 more modules** makes all five recipes composable — not the 42 that
+"47 minus 5" implies. In leverage order: `ground` (4 blocked phases), `settle`
+(3), `focus` (unblocks `nervous_ready` outright), `activate` (`flat_go` needs
+two), then `release`, `sleep`, `transition`.
+
+This is authoring and human wellbeing approval. I must not write them.
 
 ---
 
 ## H. Audio coverage
 
-One module — `nr_arrive_short` — has masters in all three mapped voices, and all
-three are now human-approved: Warm 13s, Clear 12s, Bright 11s. Those are the only
-three renditions in the entire database.
+**Complete for the launch tranche.** All five modules have approved masters in
+all three voices — 15 renditions, produced 2026-09-14 at 0.92x pace, every one
+meeting specification and every one human-approved.
 
-**No module is playable.** `intervention_modules.approved` is `false` for all
-five, so the composer selects none of them. Module approval is a separate gate
-from audio approval and should stay shut until the other four load-bearing
-modules exist — approving `nr_arrive_short` alone would produce a five-minute
-session that fails with `phase_unfilled`.
+```
+locale  voice   approved audio  missing
+en      warm    5               0
+en      clear   5               0
+en      bright  5               0
+```
+
+The mastering ladder refused one take outright (`nr_regulate_short`/clear:
+tightening the aim bought 0.21 dB of peak and cost 0.27 dB of loudness). A
+regenerated take passed first attempt. See `docs/ELSEA.md` §6t.
 
 **Four of the five load-bearing modules have no audio in any voice.** Removing any
 one of those five makes a five-minute session fail with `phase_unfilled`, so the
@@ -207,14 +223,18 @@ per voice.
 
 ## I. Session engine
 
-Proven and green: safety gate, structured interpretation, all five recipes, all
-four durations, composition, novelty, replay, cost telemetry, atomic manifest
-persistence.
+Proven and green in tests: safety gate, structured interpretation, all five
+recipes, all four durations, composition, novelty, replay, cost telemetry, atomic
+manifest persistence.
 
-**Never executed against real audio.** No manifest has ever been persisted with
-approved modules, because none exist. Composition, persistence and playback are
-individually tested; the path from input to a real session playing on a device
-has not run once.
+**First live end-to-end attempt, 2026-09-14.** The safety gate and interpretation
+worked against the real service: free text in, `nervous_ready` / 600s /
+`pre_meeting` out, raw text never leaving the server.
+
+**Composition then failed, correctly**, with `phase_unfilled` at all four
+durations — see §G. The allocator refused to repeat content or silently shorten
+the session, which is the specified behaviour. No manifest has yet been persisted
+and no audio has played on a device.
 
 ---
 
@@ -294,8 +314,8 @@ none.
 
 ## P. Known gaps
 
-1. 42 of 47 modules unauthored.
-2. No module playable; every session falls back to silence.
+1. **0 of 5 recipes compose** — needs ~8–10 more modules, not 42.
+2. 42 of 47 modules unauthored; every session still falls back to silence.
 3. RevenueCat absent — no purchase possible.
 4. Paywall UX is a 61-line placeholder.
 5. Batch production tooling not built.
@@ -314,9 +334,9 @@ none.
 - **42 intervention scripts** — authoring and wellbeing approval.
 - **Technique keys** for the existing five — proposed, none confirmed.
 - **Seven provider voices** — selection.
-- **Audio approval** for every rendition, by listening. *(Done for all three
-  renditions of `nr_arrive_short`.)*
-- **0.88× pacing** — approval after hearing the test.
+- **Audio approval** for every rendition, by listening. *(Done: all 15 for the
+  launch tranche.)*
+- ~~**Pacing**~~ — *0.92× approved 2026-09-14.*
 - **Translated content** for four locales, by human translators and reviewers.
 - **Crisis resources** per jurisdiction.
 - **Anonymous trial UX** — account required up front, or not.
@@ -328,9 +348,10 @@ none.
 
 Ordered by what unblocks the most:
 
-1. **Content.** 42 modules. Nothing downstream matters until the five
-   load-bearing ones have audio in one voice.
-2. **Audio for the remaining four load-bearing modules.**
+1. **Content.** ~8–10 modules to make all five recipes composable, starting with
+   `ground`, `settle` and `focus`. Nothing downstream matters until at least one
+   recipe can be filled.
+2. ~~Audio for the launch tranche~~ — **done**, 15 renditions in three voices.
 3. **RevenueCat integration and the entitlement webhook.**
 4. **Paywall UX.**
 5. **First real end-to-end session on a device.**
@@ -341,16 +362,14 @@ Ordered by what unblocks the most:
 
 ## S. Exact next action
 
-**Author the four remaining load-bearing module scripts.**
+**Author one `focus` module.**
 
-Everything else is either done or blocked behind content. The coverage read is
-complete, both migrations are applied, and all four Edge Functions are deployed
-and current at `f5d489f`.
+It unblocks `nervous_ready` outright — one module, one composable recipe, and the
+first time ELSEA plays a real session end to end. Then `ground` and `settle`,
+which between them unblock the remaining four recipes faster than anything else.
 
-`nr_regulate_short`, `nr_reframe_short`, `nr_prepare_short` and `nr_close_short`
-need approved English wording, then audio in one voice. Until all five of the
-load-bearing modules can play, a five-minute session fails with `phase_unfilled`
-and the product has nothing to deliver.
+Everything downstream is built and exercised: import, generate, master, approve,
+activate. Run `npm run recipes` after each module lands to see the blocked-phase
+count fall.
 
-That is authoring and human wellbeing approval. It is not an engineering task and
-I must not do it.
+Authoring and wellbeing approval are human work. I must not do them.

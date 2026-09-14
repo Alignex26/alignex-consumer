@@ -186,7 +186,18 @@ Deno.serve(async (req: Request) => {
 
   const profile = profileRow as { id: string; is_active: boolean } | null;
   if (!profile) return fail("unknown_voice_profile");
-  if (!profile.is_active) return fail("voice_profile_unavailable");
+
+  // DELIBERATELY NOT GATED ON `is_active`.
+  //
+  // `voice_profiles.is_active` means "a customer may choose this voice", and a
+  // voice cannot legitimately become selectable until approved audio exists in
+  // it. Refusing to generate for an inactive profile therefore demanded the
+  // output of the step this function is the input to — the same circular gate
+  // that `content_not_approved` had, and it blocked all five Bright masters.
+  //
+  // What generation actually requires is a real provider mapping, which is
+  // checked immediately below and still fails closed. Whether the voice is
+  // offered to customers is a separate, later, human decision.
 
   const { data: mappingRow } = await admin
     .from("provider_voice_mappings")

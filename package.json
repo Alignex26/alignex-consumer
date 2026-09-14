@@ -57,7 +57,8 @@
     "modules:validate": "node scripts/modules-validate.mjs",
     "modules:import": "node scripts/modules-import.mjs",
     "coverage": "node scripts/coverage-report.mjs",
-    "inspect:staged": "node scripts/inspect-staged.mjs"
+    "inspect:staged": "node scripts/inspect-staged.mjs",
+    "recipes": "node scripts/recipe-readiness.mjs"
   },
   "private": true,
   "jest": {

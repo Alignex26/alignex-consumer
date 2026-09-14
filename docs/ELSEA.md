@@ -1983,15 +1983,112 @@ current — so a genuinely stale function is recorded as deployed and the next c
 says it is fine. It now derives the changed functions from the diff, and treats a
 `_shared/` change as staling every function that imports it.
 
+## 6t. The launch tranche produced — 15 renditions at 0.92x
+
+2026-09-14. The first full production run, and the first time any voice had
+complete coverage of the load-bearing set.
+
+### Pace
+
+Four paces were cut for `nr_arrive_short` in warm and compared by ear:
+
+```
+1.00x  13.0s   (the previously approved master)
+0.94x  13.7s
+0.92x  14.3s
+0.88x  16.6s
+```
+
+**0.92x approved.** `nr_close_short` was tested separately at 0.92x because its
+11s ceiling is the tightest constraint in the product: it came in at 6.5s, with
+40% of the budget spare. The ceiling worry recorded in §8c was unfounded.
+
+Pace is stored centrally as the `ELEVENLABS_SPEED` function secret, not baked into
+module identity, so it is one value to change rather than 47.
+
+**Scaling is not linear and the durations should not be read as if it were.**
+Every render is a fresh take: ElevenLabs re-phrases and re-times pauses, so 0.94
+and 0.92 landed 0.6s apart while 0.88 jumped 2.3s. Some of that spread is the
+speed setting and some is variance between takes.
+
+### The run
+
+5 modules x 3 voices, all to specification:
+
+```
+module               ceiling   warm    clear   bright
+nr_arrive_short        21s     14.9    13.6    11.9
+nr_regulate_short      45s     22.8    21.3    17.7
+nr_reframe_short       40s     26.9    22.1    19.0
+nr_prepare_short       45s     28.8    22.1    25.1
+nr_close_short         11s      6.8     6.3     5.2
+```
+
+Bright runs 15–25% quicker than warm on every module at the same 0.92x setting.
+That is voice character, not a pacing fault, and it is the kind of thing a
+per-voice pace would address later if it matters.
+
+16 generation calls, ~4,000 characters.
+
+### Three things the run surfaced
+
+**The mastering ladder earned its keep twice.** `nr_regulate_short`/warm and
+`nr_prepare_short`/clear both needed a lower aim than -1.5 dBTP and passed on the
+retry. Without §6p's closed loop both would have been rejected.
+
+**One take could not be mastered at all.** `nr_regulate_short`/clear:
+
+```
+aim -1.5  ->  -16.91 LUFS / -0.74 dBTP   peak over
+aim -2.0  ->  -17.18 LUFS / -0.95 dBTP   peak still over, loudness now out
+```
+
+Tightening bought 0.21 dB of peak and cost 0.27 dB of loudness, so the loop
+stopped rather than publish something quiet — correct behaviour, and the first
+time it has refused in production. A regenerated take passed first attempt. Takes
+vary; the module was not at fault.
+
+**Bright was blocked entirely by a circular gate.** `generate-master` refused any
+voice profile with `is_active = false`, but a voice cannot legitimately become
+selectable until approved audio exists in it — so it demanded the output of the
+step it is the input to. All five Bright masters failed with
+`voice_profile_unavailable`.
+
+Exactly the shape of the `content_not_approved` defect in §6n, and a test had
+locked it in by asserting the refusal. The gate is removed; the provider-mapping
+check still fails closed, and selectability is still gated by the trigger in §6s.
+Third instance of this pattern in the project: **a gate that asks for something
+only the gated step can produce.**
+
+### State after the run
+
+```
+English content-approved       5/47
+English modules playable       5/47     (was 0)
+Voices selectable              3/10     (was 2)
+locale voice   approved audio  missing
+en     warm    5               0
+en     clear   5               0
+en     bright  5               0
+```
+
+All 15 renditions human-approved, all five modules approved, bright activated —
+the trigger permitted it, which confirms its provider mapping is live.
+
+**And nothing composes.** See §8c: five modules is necessary but not sufficient,
+and 0/5 recipes can be filled. The "NO MODULE IS PLAYABLE" blocker is gone and
+has been replaced by a more precise one.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
 
-- **No playable modules.** `intervention_modules` now holds the five
-  `nervous_ready` records with approved wording, and the first masters exist
-  (§6q) — but nothing has `approved = true`, so the composer selects none of
-  it. Every session still runs on the catalogue fallback, silent, which the UI
-  states. This remains the blocker.
+- **No recipe composes.** All five modules are approved with audio in three
+  voices (§6t), but 0/5 recipes can fill their phases: a module plays at most
+  once per session, and several phases compete for the only `prepare` module or
+  name families with nothing in them at all. Roughly 8–10 more modules fixes
+  this; see §8c for the order. Every session still runs on the catalogue
+  fallback, silent, which the UI states. This remains the blocker.
 - **Manifest persistence is atomic but still unexercised.** It now writes
   through a `security definer` RPC so a manifest and its segments land
   together or not at all. The rows are checked against the real schema
@@ -2134,85 +2231,92 @@ exists. These two are tracked separately on purpose: the first is an
 engineering result and is finished; the second is a content result and has not
 started.
 
-## 8c. The critical path — the single next action
+## 8c. The critical path — what a playable session actually needs
 
-Everything else in §8 is real, but only one thing moves ELSEA toward a playable
-session. Stated here so it is not lost among the rest.
+**This section was wrong, and the correction is the point of it.**
 
-> **Finish voice production for the five `nervous_ready` modules, then approve
-> the audio.**
->
-> Drafting, review and content approval are done (§6f, §6n), and the five
-> records are imported. Voice production has started and is one module in —
-> see §6q for exactly where. What remains is mastering, listening and approval,
-> plus the engineering already built to carry it.
+It previously said the five `nervous_ready` modules were "the smallest package
+that produces a real playable session". They are all *necessary*. They are not
+*sufficient*, and no recipe composes with them. That claim stood for days and was
+never tested against a live allocator, because until 2026-09-14 there was no
+approved audio to test with.
 
-| Module | Family | Duration | Why this length |
-|---|---|---:|---|
-| `nr_arrive_short` | `orient` | **≤21s** | tightest `arrive` slot in the product (`flat_go`) |
-| `nr_regulate_short` | `regulate` | **≤45s** | tightest `regulate` slot anywhere |
-| `nr_reframe_short` | `reframe` | **≤40s** | tightest `reframe` slot anywhere |
-| `nr_prepare_short` | `prepare` | **≤45s** | tightest `prepare` slot anywhere |
-| `nr_close_short` | `close` | **≤11s** | `wired_sleep.close` — the hardest constraint in the product |
+Run on the live database the moment all five became playable:
 
-Each still needs a **confirmed** `technique_key` from clinical (five are
-proposed, none confirmed), an explicit `approved: true`, and audio to the spec
-in §5, delivered as `<module_key>.m4a`. All five drafts fit these ceilings on
-estimate; the measured lengths replace `duration_seconds` at import.
+```
+Recipes composable: 0/5
+```
 
-**Why five and not eleven, or forty-seven.** Removing any one of these five
-makes a five-minute session fail with `phase_unfilled` — all five are
-load-bearing. The other six in the tranche change how a session *feels*, not
-whether it exists. Five is the smallest package that produces a real playable
-session.
+### Why: filling phases is a MATCHING problem, not a coverage one
 
-**Why the cross-recipe durations.** Shorter always works; longer never does. At
-21/45/40/45/11 these five serve **all five recipes**. At `nervous_ready`'s own
-limits (22/71/54/57/16) they serve one, and the other four tranches each need
-their own. Same recording session, roughly four times the coverage — and the
-choice cannot be corrected afterwards without re-recording.
+A module may be played at most once per session — `usedInSession` is threaded
+across phases in the allocator, deliberately, so composition never repeats content
+to fill time. So a recipe can name a family for every phase, have a module in
+every one of those families, and still fail, because two phases compete for the
+same single module.
 
-**The eleven-second close is the one to sanity-check before booking studio
-time.** If a closing thought cannot land in 11 seconds, that is a genuine
-finding to raise. It must not be solved by overrunning: a 12-second module
-silently removes the five-minute session from `wired_sleep`.
+`nervous_ready` is exactly that case. Every one of its six phases names a family
+we have:
 
-### Then, in order
+```
+3. build_readiness            prepare, activate  -> nr_prepare_short
+4. direct_attention_forward   focus, prepare     -> nothing left
+```
 
-1. ~~Content review, clinical review~~ — **done 2026-09-09.** Approved by the
-   product owner as general wellbeing content under S4 as amended. Technique
-   keys remain proposed and `intensity` is still open; neither blocks
-   recording.
-2. ~~Approval~~ — **granted.** The `approved` flag flips at import, once audio
-   exists.
-3. ~~Import the five content records~~ — **done.** Wording, ceilings and
-   version rows are in the database; content approval is recorded. Audio is a
-   separate step, and a separate approval (§6n).
-4. **In progress — voice production, one module deep.** `nr_arrive_short` has a
-   Warm master produced and human-approved, and a Clear staged render awaiting
-   re-mastering. The immediate actions, in this order:
-   1. **Approve the Warm rendition.** It was approved by a human but the
-      database row very probably does not say so — see §6q. Independent of
-      everything below; do it first.
-   2. **Re-master Clear** from the existing staged MP3. No regeneration, no
-      provider call: `node scripts/finalise-master.mjs --module nr_arrive_short
-      --locale en --voice clear --commit`.
-   3. **Generate and finalise Bright**, then listen to all three and decide
-      casting.
-   4. **Repeat for the remaining four modules** in the three cast voices.
-5. Set `approved` true on the modules whose audio has been listened to and
-   accepted. Nothing is playable until this happens (§6n).
-7. **First real composition** — the composer selects approved modules for the
-   first time.
-8. **First manifest persisted** — never executed before.
-9. **First real session played on-device**, and with it pause, resume, early
-   exit, timing, outcome, and the sound layer, against real audio.
-10. Resolve whatever that surfaces, then FUNCTIONALLY COMPLETE can be declared.
+One `prepare` module, two phases wanting it, no `focus` module at all. A coverage
+checklist says "all families present" and is wrong. `scripts/recipe-readiness.mjs`
+computes a maximum bipartite matching instead, which is what the allocator
+effectively does.
 
-Steps 7 to 9 are the untested stretch. Everything before them has now been
-exercised; see §6d. Step 9 is also the first time the sound layer will be heard
-at all — it lives in the manifest player, which is dormant until a manifest
-exists (§6e).
+### What every recipe is missing
+
+| Recipe | Phases | Unfillable | Missing |
+|---|---:|---:|---|
+| `nervous_ready` | 6 | 1 | `focus` (or a second `prepare`) |
+| `flat_go` | 7 | 2 | `activate` x2 — both phases name only `activate` |
+| `scattered_focused` | 6 | 2 | `release`\|`ground`, `focus`\|`ground` |
+| `wired_sleep` | 6 | 2 | `settle`\|`release`, `sleep`\|`settle` |
+| `wound_up_home` | 6 | 2 | `ground`\|`transition`\|`settle`, `settle`\|`ground` |
+
+**Not a duration problem.** Minimum phase times total 215–275s, so every recipe
+fits inside a five-minute session with room. All four canonical durations fail
+identically, for the same missing families.
+
+### The order that unblocks the most per module
+
+1. **`ground`** — four blocked phases across three recipes. The highest-leverage
+   single module in the library.
+2. **`settle`** — three blocked phases across two recipes.
+3. **`focus`** — unblocks `nervous_ready` outright: one module, one working
+   recipe, and the first genuinely playable session.
+4. **`activate`** — `flat_go` needs **two**, because both its blocked phases
+   accept nothing else.
+5. **`release`**, **`sleep`**, **`transition`** — one phase each.
+
+**Roughly 8–10 more modules makes all five recipes composable**, not the 42 that
+"47 minus 5" implies. The remaining 30-odd are depth, novelty and variation —
+they change how a session *feels* and whether repeat sessions differ, not whether
+a session can exist at all.
+
+### What is already done
+
+- Wording authored, reviewed and content-approved for all five (§6f, §6n).
+- Audio produced in **warm, clear and bright** at 0.92x pace, mastered to
+  specification, and human-approved — 15 renditions (§6r, §6t).
+- All five modules `approved = true`; three voices selectable.
+- Safety gate and interpretation proven live: free text in, `nervous_ready` /
+  600s / `pre_meeting` out, raw text never leaving the server.
+
+### The single next action
+
+**Author one `focus` module.** It is the cheapest route to the first composable
+recipe, and the first time ELSEA will play a real session end to end.
+
+Then `ground` and `settle`, which unblock the remaining four recipes faster than
+anything else.
+
+Authoring and wellbeing approval are human work. The production path behind them
+is built and exercised: import, generate, master, approve, activate.
 
 ## 9. Working on it
 
