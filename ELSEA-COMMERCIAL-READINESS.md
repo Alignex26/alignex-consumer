@@ -8,7 +8,8 @@ almost no content for it to play.** Five of forty-seven modules are authored, no
 module is playable, and every session today falls back to silence. Nothing in the
 commercial layer changes that, and no amount of it can.
 
-Last updated at commit following `2f21b5e`.
+Last updated at `d276475`. Live figures read from `alignex-consumer-dev`
+on 2026-09-14 with `npm run coverage`.
 
 ---
 
@@ -17,10 +18,10 @@ Last updated at commit following `2f21b5e`.
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | see §O |
+| Tests | 766 passing across 25 suites |
 | TypeScript | clean (app and functions) |
-| Migrations | 18 written |
-| Edge functions | `interpret`, `compose`, `voice-check`, `generate-master` |
+| Migrations | 18 written, **all applied** |
+| Edge functions | all four deployed and current at `f5d489f` |
 
 **Built and verified this pass**
 
@@ -105,7 +106,7 @@ store.**
 |---|---|---|---|---|---|
 | 1 | `warm` | Warm | yes (default) | yes | 1 approved rendition |
 | 2 | `clear` | Clear | yes | yes | 1 approved rendition |
-| 3 | `bright` | Bright | **no** | yes | needs verification |
+| 3 | `bright` | Bright | **no** | yes | rendition exists, **not approved** |
 | 4 | `grounded` | Grounded | no | no | none |
 | 5 | `gentle` | Gentle | no | no | none |
 | 6 | `direct` | Direct | no | no | none |
@@ -125,11 +126,14 @@ mapping, so none of the seven can become selectable by accident. That exact
 mistake was made once before, when `bright` was inserted active before any
 mapping existed.
 
-**`bright` requires verification, not assumption.** The product owner has said it
-sounds good. Whether `module_renditions.approved` is `true` in the live database
-has not been read — it needs the service-role credential. Run `npm run coverage`.
-It must not be activated merely because one rendition exists: activation requires
-audio coverage across the launch catalogue, which does not exist for any voice.
+**`bright` is verified, and it is not approved.** Read from the live database:
+the rendition exists at 11s and `approved` is `false`. The product owner has said
+it sounds good, but that remark is not an approval record, and it should not be
+made one from a line in a specification.
+
+Even once approved, it must not be activated on the strength of one rendition:
+activation requires audio coverage across the launch catalogue, which does not
+exist for any voice.
 
 ---
 
@@ -164,7 +168,7 @@ created or approved by me.
 | Planned | **47** |
 | Authored (English) | **5** |
 | Content-approved (English) | **5** |
-| With any approved audio | **≤2** — needs verification |
+| With any approved audio | **1** (`nr_arrive_short`, in warm and clear) |
 | Playable modules | **0** |
 
 The five are the `nervous_ready` tranche: `nr_arrive_short`,
@@ -181,8 +185,9 @@ interventions need authoring and human wellbeing approval. I must not write them
 
 ## H. Audio coverage
 
-One module — `nr_arrive_short` — has masters. Warm and Clear are human-approved;
-Bright's database state needs verification.
+One module — `nr_arrive_short` — has masters, in all three mapped voices. Warm
+(13s) and Clear (12s) are approved; Bright (11s) is not. Three renditions exist in
+the entire database.
 
 **Four of the five load-bearing modules have no audio in any voice.** Removing any
 one of those five makes a five-minute session fail with `phase_unfilled`, so the
@@ -330,14 +335,16 @@ Ordered by what unblocks the most:
 
 ## S. Exact next action
 
-```
-npm run coverage
-```
+**Author the four remaining load-bearing module scripts.**
 
-Read-only, needs `SUPABASE_SERVICE_ROLE_KEY`. It answers the three questions
-this document had to leave open: whether Bright's rendition is approved, whether
-Warm's approval was ever recorded, and exactly which modules have audio.
+Everything else is either done or blocked behind content. The coverage read is
+complete, both migrations are applied, and all four Edge Functions are deployed
+and current at `f5d489f`.
 
-Then, in order: apply the two new migrations (`npx supabase db push`), and begin
-authoring the four remaining load-bearing module scripts — because that is the
-only path to a product that plays anything.
+`nr_regulate_short`, `nr_reframe_short`, `nr_prepare_short` and `nr_close_short`
+need approved English wording, then audio in one voice. Until all five of the
+load-bearing modules can play, a five-minute session fails with `phase_unfilled`
+and the product has nothing to deliver.
+
+That is authoring and human wellbeing approval. It is not an engineering task and
+I must not do it.

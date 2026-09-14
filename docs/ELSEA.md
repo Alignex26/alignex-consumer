@@ -1716,83 +1716,69 @@ Clear is ready to re-master from the existing staged file, with no regeneration:
 node scripts/finalise-master.mjs --module nr_arrive_short --locale en --voice clear --commit
 ```
 
-## 6q. Live audio state — reported, inferred, and unverified
+## 6q. Live audio state — read from the database, 2026-09-14
 
-This section is deliberately separated from the rest because **I have not read
-the live database in this pass.** The operator credential exists only in the
-product owner's PowerShell session, and the content tables are service-role only,
-so an anon read returns nothing. What follows is labelled by how it is known.
+Previously this section carried an inference. It was wrong, and what replaces it
+was read from the live project `alignex-consumer-dev` with `npm run coverage`.
 
-### Reported by the product owner
-
-- The first real **Warm** master for `nr_arrive_short / en / warm / version 1`
-  was produced, passed the production specification, and was **listened to and
-  approved** by the product owner.
-- A real **Clear** staged MP3 exists at
-  `staging/en/clear/nr_arrive_short.v1.mp3`. Measured by the current code its
-  source is **-27.5 LUFS / -8.9 dBTP** — quiet, and needing around 11 dB of gain.
-  The -17.0 / -0.9 figure reported earlier was the old chain's *output*, not this
-  file; see §6p.
-- **Two `finalise-master` runs on it have been rejected**, both correctly, and
-  neither uploaded anything. The second rejection exposed the downmix defect.
-
-### Inferred, not verified
-
-The casting-pass PowerShell block ordered the operations: generate Clear,
-finalise Clear, generate Bright, finalise Bright, **then** approve Warm. The
-Clear finalise failed on the true-peak gate, which halted the block before the
-approval step.
-
-**So the Warm rendition is very probably still `approved = false` in the
-database, despite having been approved by a human.** That is an inference from
-the block's ordering and the reported failure, not a reading of the row. It must
-be checked before anyone concludes that audio approval is broken.
-
-### The staged Clear render, now verified
-
-Read off the object rather than inferred:
+### What is actually there
 
 ```
-sha256   6e619d343f675fb2c85249f11bd71e32c372857ff0d2ed56dead931abf51e385
-bytes    190633
-mp3, 44100 Hz, 1 channel MONO, 128k, 11.84s
--27.52 LUFS   -8.91 dBTP
+module          voice    locale  version  approved  duration
+nr_arrive_short warm     en      1        TRUE      13s
+nr_arrive_short clear    en      1        TRUE      12s
+nr_arrive_short bright   en      1        false     11s
 ```
 
-Quiet, mono, and needing about 11.5 dB of gain it has no peak headroom for. Three
-`finalise-master` runs on it have been rejected, all correctly, none of which
-uploaded anything.
+Three renditions, all of one module. **Warm and Clear are approved. Bright is
+not.**
 
-### Diagnosed
+### The correction
 
-Inspection settled it (§6p). loudnorm delivers exactly -1.50 dBTP in dynamic
-mode; the AAC encoder then adds nearly 3 dB. Mastering now closes the loop on the
-encoded file and aims lower when the encoder spoils it.
+This section previously said Warm's approval was "very probably" not recorded,
+reasoning that the casting block approved Warm last and halted on the Clear
+failure. **That inference was wrong.** Warm is approved, and so is Clear — which
+also means the Clear master was eventually produced and accepted, after the
+mastering defect in §6p was fixed.
 
-**Expected on the next run:** the first aim of -1.5 will still produce roughly
-+1.4 dBTP, and the ladder will tighten — on these numbers to about -4, landing
-near -1.1 dBTP with loudness around -16.6. `finalise-master` prints every attempt
-and the overshoot each one cost, so the encoder's behaviour on that machine
-becomes visible rather than inferred.
+The reasoning was sound and the conclusion was false, which is worth keeping
+visible: it was a guess about state that one read-only query could have settled at
+any point. The lesson is the same one §6p keeps teaching — infer nothing that can
+be measured.
 
-If the ladder is exhausted the run refuses and uploads nothing, which is the
-correct outcome: it would mean this take cannot meet both limits at 96 kbps, and
-that is a decision to take deliberately, not by publishing something quiet.
+**Bright needs a human decision, not a database fix.** The product owner has said
+it sounds good; the rendition exists and is unapproved. It should not be approved
+here on the strength of a remark in a specification.
 
-### Not started
+### Nothing is playable
 
-- **Bright** — not generated. No staged file.
-- No module has `intervention_modules.approved = true`, so nothing is playable
-  and every session still runs on the silent catalogue fallback.
+```
+English content-approved       5/47
+English modules playable       0/47
+Locales content-ready          1/5
+Voices selectable              2/10
+Voices provider-mapped (en)    3/10
+```
 
-### The ordering lesson
+`nr_arrive_short` has approved audio in two voices, but
+`intervention_modules.approved` is false for all five modules, so the composer
+selects none of them. Every session still runs on the silent catalogue fallback.
 
-`finalise-master.mjs` writes `approved: false` on **every** run. Re-finalising an
-already-approved rendition therefore silently un-approves it. The casting block
-approved Warm last for that reason — but that ordering is also what left the
-human approval unrecorded when the block halted early. Approving Warm is
-independent of generating Clear and Bright and should not have been sequenced
-behind them.
+Four of the five load-bearing modules have no audio at all: `nr_regulate_short`,
+`nr_reframe_short`, `nr_prepare_short`, `nr_close_short`. Removing any one of the
+five makes a five-minute session fail with `phase_unfilled`, so the minimum
+playable library is all five in at least one voice.
+
+### A measurement that lied, caught in passing
+
+While reading the above, `@(Invoke-RestMethod ...).Count` reported **1 rendition**
+in the whole database, immediately after a filtered query had returned **3** for a
+single module. The count was a PowerShell artifact, not a fact, and it nearly went
+into this document as one. Printing the raw response settled it.
+
+That is the third time in this project a check has confidently reported the wrong
+number. The habit that catches it is cheap: when two measurements disagree, print
+the raw response rather than picking the one that looks right.
 
 ## 6r. Delivery pace — slowing the cast voices
 
