@@ -2,14 +2,14 @@
   {
     "module_key": "settle_rest_short",
     "family": "settle",
-    "technique_key": "PROPOSED_permission_to_stop",
+    "technique_key": "permission_to_stop",
     "storage_path": "modules/settle/settle_rest_short.m4a",
     "duration_seconds": 24,
     "requires_headphones": false,
     "is_bed": false,
     "version": 1,
     "approved": false,
-    "script_text": "Nothing more needs doing now. Let the day stop here. Let yourself be heavier than you were — shoulders down, jaw loose, hands open. You don't have to wind down on purpose. Just stop adding to it. Let the room go quiet around you. You are somewhere you don't have to leave.",
-    "content_approved": false
+    "script_text": "Nothing more needs doing now. Let the day stop here. Let yourself be heavier than you were \u2014 shoulders down, jaw loose, hands open. You don't have to wind down on purpose. Just stop adding to it. Let the room go quiet around you. You are somewhere you don't have to leave.",
+    "content_approved": true
   }
 ]

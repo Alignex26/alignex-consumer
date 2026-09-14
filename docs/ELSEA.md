@@ -48,13 +48,13 @@ Last updated: 2026-09-09.
 | Lint | clean |
 | Migrations | 18 written, **all applied** |
 | Edge functions | all four deployed and current — marker `8126ffda` |
-| Modules | **8 of 47** authored, content-approved and playable |
-| Audio | **24 renditions, all approved** — 8 modules x warm, clear, bright, at 0.92x |
-| Recipes | **2 of 5 composable** (`nervous_ready`, `flat_go`) |
+| Modules | **10 authored and playable**; ~72 needed (§6w) |
+| Audio | **30 renditions, all approved** — 10 modules x warm, clear, bright, at 0.92x |
+| Recipes | **27 of 60** recipe/duration/voice combinations compose |
 | Voices | `warm` (default), `clear`, `bright` all selectable. 7 more catalogued, unmapped |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content** |
 | Commercial | entitlement schema live; **RevenueCat absent, no purchase possible** |
-| Blocking | `settle` and `ground`/`release`; **nothing has been heard on a device** |
+| Blocking | library depth (§6w); **nothing has been heard on a device** |
 
 **As of 2026-09-14 the product composes a real session.** Free text enters the
 safety gate, `nervous_ready` composes at all four durations from six approved
@@ -2275,13 +2275,124 @@ Clear failing all three times is consistent with it rendering quieter than warm
 and bright — it needs more gain, so it sits harder against both constraints and
 finds the narrow window first.
 
+## 6w. The readiness tool was wrong, and 47 modules is not enough
+
+2026-09-14. Three findings, and the first is a mistake of mine that had already
+been acted on.
+
+### A tool that said the library was finished
+
+`recipe-readiness.mjs` modelled phase-filling as a maximum bipartite matching and
+reported **5/5 recipes composable**. The composer managed **27 of 60**
+recipe/duration/voice combinations. The tool was confidently, specifically wrong,
+and wrong in the direction that costs money: it said stop authoring.
+
+Two things the model missed, both deliberate in the allocator:
+
+**A phase chains modules.** `fillPhase` loops `while (remaining > 0)`, so one
+phase can consume several, and each is out of contention for every later phase. A
+`nervous_ready` session eats 7–8 of the 10 modules. This is why LONGER durations
+fail first — the opposite of what a matching predicts, and the clue that should
+have been followed sooner.
+
+**Selection is greedy, with no lookahead.** `pick` takes best-rated then longest.
+In `flat_go`, `choose_first_move` accepts `focus|prepare` and takes the longer
+`prepare`; `build_momentum` accepts `activate|prepare` and finds both gone. A
+valid assignment existed. The allocator does not look for it, by design — "a
+packing algorithm nobody can predict is worth less" than one that is legible.
+
+**The tool now calls `compose` instead of modelling it.** A model of a system is
+a second implementation that has to be kept true, and this one was not.
+
+This is the same failure this document keeps recording in other people's code —
+a check that reports success while confirming the wrong thing — built here, by
+me, and reported to the product owner as fact.
+
+### The library needs about 72 modules, not 47
+
+`scripts/library-sizing.mjs` answers the question the readiness tool cannot: how
+many modules per family are needed, for modules that do not exist yet and so
+cannot be composed.
+
+It reimplements `allocate`, `fillPhase` and `pick` — and then **refuses to trust
+itself**. It first replays the real library and asserts it reproduces the
+composer's actual 60 results exactly; on any mismatch it exits rather than
+extrapolate. That gate caught a real error on the first run (see below).
+
+```
+n per family   composes
+     1           30/60
+     2           42/60
+     3           51/60
+     4           57/60
+     5           57/60    <- plateau
+     6           60/60
+```
+
+**Six per family, 72 modules.** The canonical plan of 47 across 12 families
+averages under four, which lands around 57/60.
+
+The plateau at 4–5 is the greedy allocator rather than scarcity: `wound_up_home`
+at 1200s keeps losing a module to an earlier phase. Depth eventually outruns it.
+
+Uniform depth is also not the cheapest shape — the contested families
+(`prepare`, `activate`, `focus`, `settle`) carry more phases than the rest, so a
+weighted library may reach 60/60 below 72. Treat 72 as a floor with even
+spreading, not a target.
+
+### Declared durations were estimates nobody updated
+
+The sizing model's validation gate failed on its first run: it disagreed with the
+composer on `scattered_focused @ 300s / bright`. The cause was worth more than
+the model.
+
+**The allocator plans against `intervention_modules.duration_seconds`** — set
+from the draft manifests as an estimate, before any audio existed — and nothing
+updated it afterwards. `finalise-master` writes the measured length to the
+RENDITION and leaves the module's own value alone.
+
+```
+module               declared   measured (w/c/b)
+nr_regulate_short       45s        23 / 21 / 18
+nr_reframe_short        40s        27 / 22 / 19
+nr_prepare_short        45s        29 / 28 / 25
+nr_arrive_short         21s        15 / 14 / 12
+```
+
+A 300s session allocated 190s to speech that really ran about 125s. **Roughly 58%
+of that session was silence nobody planned**, against the 37% the manifest
+implied.
+
+**The obvious fix was the wrong one.** The composer already holds the resolved
+rendition and could plan against its real length — but it deliberately does not,
+and says so: the allocator plans with the canonical length "so the SAME
+techniques are chosen whichever voice is playing. Only the recording differs,
+which is the whole point." Planning per voice would mean changing voice changes
+which interventions somebody gets.
+
+So `scripts/sync-durations.mjs` makes the canonical value true instead, taking
+the LONGEST approved rendition — at the average, the slowest voice would overrun
+its segment into the next one. Dry run by default; run it after any mastering
+batch.
+
+**70 seconds of phantom silence removed across ten modules.** Composition still
+succeeds in the same 27/60, but sessions now carry more speech:
+`nervous_ready@300s` went from 7 modules to 8, `scattered_focused@300s` from 6 to
+7. Honest lengths let the allocator chain more content into the same time.
+
+Version rows are untouched: `intervention_module_versions.duration_seconds` is
+part of a version's identity and the append-only trigger refuses to change it.
+A version records what was approved, not what was later measured.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
 
-- **Three of five recipes do not compose.** `nervous_ready` and `flat_go` do.
-  The rest need `settle` (blocks two recipes, two phases each) and `ground` or
-  `release`. Two more modules at minimum. See §8c.
+- **Only 27 of 60 recipe/duration/voice combinations compose.** `nervous_ready`
+  and `wired_sleep` work at every duration; `scattered_focused` only at 300s;
+  `flat_go` and `wound_up_home` at none. The library needs roughly **72 modules**
+  (six per family), not the 47 planned — see §6w. Depth in the contested
+  families matters more than breadth.
 - **No session has ever been heard.** Composition and persistence are proven;
   device playback, outcome capture, novelty and replay are not.
 - **Manifest persistence is atomic but still unexercised.** It now writes

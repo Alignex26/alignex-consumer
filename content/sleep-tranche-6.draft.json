@@ -1,0 +1,15 @@
+[
+  {
+    "module_key": "sleep_allow_short",
+    "family": "sleep",
+    "technique_key": "release_of_effort",
+    "storage_path": "modules/sleep/sleep_allow_short.m4a",
+    "duration_seconds": 8,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "Let the day be over now. There is nothing else to do. Sleep will come when it comes.",
+    "content_approved": true
+  }
+]

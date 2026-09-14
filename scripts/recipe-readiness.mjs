@@ -1,29 +1,52 @@
 #!/usr/bin/env node
 //
-// Can each recipe actually be composed from the modules that exist?
+// Can each recipe actually be composed? Asked of the composer, not of a model.
 //
 //   SUPABASE_SERVICE_ROLE_KEY=... node scripts/recipe-readiness.mjs
+//   ... node scripts/recipe-readiness.mjs --voice clear
 //
-// READ-ONLY. No writes, no uploads, no provider calls.
+// READ-ONLY. It calls `compose`, which reads and returns a manifest; it does not
+// persist one, because persistence requires a signed-in user and this runs with
+// the service role, which has no `sub`.
 //
-// WHY THIS IS NOT JUST "DOES EVERY FAMILY HAVE A MODULE".
+// ---------------------------------------------------------------------------
+// WHY THIS NO LONGER SIMULATES THE ALLOCATOR
+// ---------------------------------------------------------------------------
 //
-// A module may be played at most once per session — `usedInSession` is threaded
-// across phases in the allocator, so composition never repeats content to fill
-// time. That makes phase-filling a MATCHING problem, not a coverage one: a recipe
-// can have a module for every family it names and still fail, because two phases
-// compete for the same single module.
+// The first version of this script computed a maximum bipartite matching of
+// phases to modules. It reported 5/5 recipes composable when the real composer
+// could manage 27 of 60 recipe/duration/voice combinations. It was confidently,
+// specifically wrong, and it was wrong in the direction that costs money: it
+// said the library was finished.
 //
-// That is exactly what happened with `nervous_ready`. Every one of its six phases
-// named a family we had. It failed anyway:
+// Two things the model missed, both of which are deliberate in the allocator:
 //
-//     build_readiness            prepare, activate  -> nr_prepare_short
-//     direct_attention_forward   focus, prepare     -> nothing left
+//   1. A PHASE CHAINS MODULES. `fillPhase` loops `while (remaining > 0)`, so one
+//      phase can consume several modules, and every one it takes is out of
+//      contention for every later phase. A 600s session swallows more of the
+//      library than a 300s one — which is why longer durations fail FIRST, the
+//      opposite of what a matching predicts.
 //
-// One `prepare` module, two phases wanting it, and no `focus` module at all. A
-// coverage report says "all families present" and is wrong. This computes a
-// maximum bipartite matching instead, which is what the allocator effectively
-// does, and reports the phases that genuinely cannot be filled.
+//   2. SELECTION IS GREEDY, WITH NO LOOKAHEAD. `pick` takes best-rated then
+//      longest. In `flat_go`, `choose_first_move` accepts focus|prepare and
+//      takes the longer `prepare`; `build_momentum` accepts activate|prepare and
+//      finds both gone. A matching finds the assignment that works. The
+//      allocator does not look for it, on purpose — "a packing algorithm nobody
+//      can predict is worth less" than one that is legible.
+//
+// A model of a system is a second implementation that has to be kept true. This
+// asks the system.
+// ---------------------------------------------------------------------------
+
+const args = process.argv.slice(2);
+const pick = (flag, fallback = null) => {
+  const i = args.indexOf(flag);
+  return i >= 0 ? args[i + 1] : fallback;
+};
+
+const DURATIONS = [300, 600, 900, 1200];
+const onlyVoice = pick('--voice');
+const locale = pick('--locale', 'en');
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -33,7 +56,11 @@ if (!url || !serviceKey) {
   process.exit(2);
 }
 
-const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+const headers = {
+  apikey: serviceKey,
+  Authorization: `Bearer ${serviceKey}`,
+  'Content-Type': 'application/json',
+};
 
 async function rest(path) {
   const response = await fetch(`${url}/rest/v1/${path}`, { headers });
@@ -44,110 +71,97 @@ async function rest(path) {
   return response.json();
 }
 
-const [transitions, phases, phaseFamilies, modules] = await Promise.all([
+async function compose(transitionKey, durationSeconds, voiceProfile) {
+  const response = await fetch(`${url}/functions/v1/compose`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      transition_key: transitionKey,
+      duration_seconds: durationSeconds,
+      voice_profile: voiceProfile,
+      locale,
+    }),
+  });
+  try {
+    return await response.json();
+  } catch {
+    return { ok: false, failure: `http_${response.status}` };
+  }
+}
+
+const [transitions, voices, modules] = await Promise.all([
   rest('transitions?select=key&order=key'),
-  rest('recipe_phases?select=transition_key,ordinal,phase,min_seconds,max_seconds&order=transition_key,ordinal'),
-  rest('recipe_phase_families?select=transition_key,phase,family'),
-  rest('intervention_modules?select=module_key,family,approved,is_active&order=module_key'),
+  rest('voice_profiles?select=id,is_active&is_active=eq.true&order=sort_order'),
+  rest('intervention_modules?select=module_key,family,approved&approved=eq.true&order=module_key'),
 ]);
 
-/** Only a module that would actually be selected counts. */
-const playable = modules.filter((m) => m.approved && m.is_active);
-
-/**
- * Maximum bipartite matching, phases to modules (Kuhn's algorithm).
- *
- * Returns the set of phase indices that could not be matched. Any phase left
- * unmatched is a phase the allocator would fail on with `phase_unfilled`.
- */
-function unfillablePhases(phaseList, eligibleFor) {
-  const matchedModule = new Map(); // module_key -> phase index
-  const seen = new Set();
-
-  function augment(phaseIndex) {
-    for (const moduleKey of eligibleFor[phaseIndex]) {
-      if (seen.has(moduleKey)) continue;
-      seen.add(moduleKey);
-      if (!matchedModule.has(moduleKey) || augment(matchedModule.get(moduleKey))) {
-        matchedModule.set(moduleKey, phaseIndex);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  const unmatched = [];
-  for (let i = 0; i < phaseList.length; i += 1) {
-    seen.clear();
-    if (!augment(i)) unmatched.push(i);
-  }
-  return unmatched;
-}
+const voiceList = onlyVoice ? voices.filter((v) => v.id === onlyVoice) : voices;
 
 console.log('');
-console.log('  RECIPE READINESS');
+console.log('  RECIPE READINESS — asked of the composer');
 console.log('  ' + '='.repeat(74));
 console.log('');
-console.log(`  ${playable.length} playable module(s): ` +
-  (playable.length ? playable.map((m) => `${m.module_key} (${m.family})`).join(', ') : 'none'));
+console.log(`  ${modules.length} playable module(s), ${voiceList.length} voice(s), ` +
+  `${DURATIONS.length} durations = ${transitions.length * voiceList.length * DURATIONS.length} combinations`);
 console.log('');
 
-const familiesNeeded = new Set();
-let readyCount = 0;
+let ok = 0;
+let total = 0;
+const failures = [];
 
 for (const t of transitions) {
-  const recipePhases = phases.filter((p) => p.transition_key === t.key);
-  if (recipePhases.length === 0) continue;
-
-  const eligibleFor = recipePhases.map((p) => {
-    const fams = phaseFamilies
-      .filter((f) => f.transition_key === t.key && f.phase === p.phase)
-      .map((f) => f.family);
-    return playable.filter((m) => fams.includes(m.family)).map((m) => m.module_key);
-  });
-
-  const unmatched = unfillablePhases(recipePhases, eligibleFor);
-  const minTotal = recipePhases.reduce((sum, p) => sum + p.min_seconds, 0);
-
-  console.log(`  ${t.key}`);
-  console.log(`    ${recipePhases.length} phases, minimum ${minTotal}s`);
-
-  if (unmatched.length === 0) {
-    readyCount += 1;
-    console.log('    COMPOSABLE — every phase can be filled without repeating a module.');
-  } else {
-    console.log(`    NOT COMPOSABLE — ${unmatched.length} phase(s) cannot be filled:`);
-    for (const i of unmatched) {
-      const p = recipePhases[i];
-      const fams = phaseFamilies
-        .filter((f) => f.transition_key === t.key && f.phase === p.phase)
-        .map((f) => f.family);
-      for (const f of fams) familiesNeeded.add(f);
-      const why = eligibleFor[i].length === 0
-        ? 'no module in any accepted family'
-        : `only ${eligibleFor[i].join(', ')} — taken by an earlier phase`;
-      console.log(`      ${p.ordinal}. ${p.phase.padEnd(26)} needs ${fams.join('|').padEnd(20)} ${why}`);
+  const cells = [];
+  for (const d of DURATIONS) {
+    const results = [];
+    for (const v of voiceList) {
+      const r = await compose(t.key, d, v.id);
+      total += 1;
+      if (r.ok) {
+        ok += 1;
+        results.push((r.manifest?.segments ?? []).filter((s) => s.kind === 'module').length);
+      } else {
+        results.push(null);
+        failures.push({ recipe: t.key, duration: d, voice: v.id, failure: r.failure });
+      }
     }
+    const worked = results.filter((n) => n !== null);
+    cells.push(
+      worked.length === results.length
+        ? `${d}s ${Math.min(...worked)}-${Math.max(...worked)}mod`.padEnd(16)
+        : `${d}s FAIL`.padEnd(16)
+    );
   }
-  console.log('');
+  console.log(`  ${t.key.padEnd(19)} ${cells.join('')}`);
 }
 
+console.log('');
 console.log('  ' + '-'.repeat(74));
-console.log(`  Recipes composable: ${readyCount}/${transitions.length}`);
+console.log(`  Compositions that succeed: ${ok}/${total}`);
 console.log('');
 
-if (familiesNeeded.size > 0) {
-  const byFamily = new Map();
-  for (const f of familiesNeeded) {
-    byFamily.set(f, playable.filter((m) => m.family === f).length);
+if (failures.length > 0) {
+  const byReason = new Map();
+  for (const f of failures) {
+    const key = `${f.recipe} @ ${f.duration}s — ${f.failure}`;
+    byReason.set(key, (byReason.get(key) ?? 0) + 1);
   }
-  console.log('  Families that would unblock a phase, and what exists in each:');
-  for (const [f, n] of [...byFamily].sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))) {
-    console.log(`    ${f.padEnd(12)} ${n} playable module(s)`);
+  console.log('  Failures:');
+  for (const [reason, count] of byReason) {
+    console.log(`    ${reason}${count > 1 ? `  (${count} voices)` : ''}`);
   }
   console.log('');
-  console.log('  A family showing 0 blocks every phase that names it. A family showing 1 or');
-  console.log('  more still blocks a phase when an earlier phase in the same session already');
-  console.log('  used the only module — which is why this is a matching, not a checklist.');
+  console.log('  `phase_unfilled` means a phase had no eligible module left — either');
+  console.log('  nothing short enough, or everything eligible was already used earlier');
+  console.log('  in the same session. Selection is greedy and does not look ahead, so a');
+  console.log('  later phase can be starved by an earlier one taking the module it needed.');
+  console.log('  More modules in the contested families is the fix, not a smarter search.');
   console.log('');
 }
+
+const byFamily = new Map();
+for (const m of modules) byFamily.set(m.family, (byFamily.get(m.family) ?? 0) + 1);
+console.log('  Playable modules per family:');
+for (const [family, n] of [...byFamily].sort()) {
+  console.log(`    ${family.padEnd(12)} ${n}`);
+}
+console.log('');

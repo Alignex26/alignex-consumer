@@ -1,0 +1,15 @@
+[
+  {
+    "module_key": "ground_weight_short",
+    "family": "ground",
+    "technique_key": "weight_and_support",
+    "storage_path": "modules/ground/ground_weight_short.m4a",
+    "duration_seconds": 22,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "Let your weight go down. However you are sitting or standing, the ground is taking all of it \u2014 and it has been the whole time. You don't have to hold yourself up. Let the floor do that. Whatever else is going on, this part is steady. It isn't going anywhere.",
+    "content_approved": true
+  }
+]
