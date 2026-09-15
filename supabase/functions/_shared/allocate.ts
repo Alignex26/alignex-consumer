@@ -162,6 +162,12 @@ export function scoresFrom(
  * phase that cannot be started at all fails explicitly rather than quietly
  * shortening the session.
  *
+ * A PHASE ALSO STOPS CHAINING RATHER THAN STARVE A LATER ONE. See
+ * `mayTakeAnother`: taking a second, third or fourth module is only allowed
+ * while every phase still to come can be filled. This turned nine failing
+ * combinations into working sessions and changed nothing about the fifty-one
+ * that already worked — verified case by case, module count included.
+ *
  * NOT OPTIMAL PACKING, DELIBERATELY. Modules are taken best-rated first, then
  * longest, which can leave more silence than a perfect fit would: given a 400s
  * slot and modules of 250s, 200s and 180s, this takes the 250 and stops, where
@@ -178,7 +184,25 @@ export function fillPhase(
    * added, so the next phase cannot pick them. Defaulted so the function stays
    * usable on its own in tests.
    */
-  used: Set<string> = new Set<string>()
+  used: Set<string> = new Set<string>(),
+  /**
+   * Whether this phase may take ANOTHER module beyond its first.
+   *
+   * THE RESERVATION RULE. Chaining is what makes a phase use its whole
+   * allocation, and it is also what let an early phase drain a pool that a
+   * later phase depended on. `wound_up_home` at 1200s failed exactly this way:
+   * `reconnect_to_now` is allocated 346 seconds and accepts `ground`,
+   * `transition` and `settle`; it chained through all of them and the `settle`
+   * phase immediately after it found nothing left.
+   *
+   * So a phase takes its FIRST module unconditionally — that is what the phase
+   * is for, and reserving against it would help nobody — and takes extras only
+   * while every later phase can still be filled.
+   *
+   * Defaulted to permissive, so a caller that does not care (and every existing
+   * test) behaves exactly as before.
+   */
+  mayTakeAnother: (moduleId: string) => boolean = () => true
 ): PlanModule[] {
   const chosen: PlanModule[] = [];
   let remaining = allocatedSeconds;
@@ -193,12 +217,50 @@ export function fillPhase(
     );
     if (!next) break;
 
+    // The first is unconditional; every one after it must not starve a later
+    // phase.
+    if (chosen.length > 0 && !mayTakeAnother(next.id)) break;
+
     chosen.push(next);
     used.add(next.id);
     remaining -= next.durationSeconds;
   }
 
   return chosen;
+}
+
+/**
+ * Could every phase from `from` onward still take at least one distinct module?
+ *
+ * ONE LOOK FORWARD, NO SEARCH. It walks the remaining phases in order and gives
+ * each the module `pick` would choose, exactly as the real run will. It does not
+ * backtrack, reorder, or hunt for an assignment the greedy pass would never
+ * find — so it cannot claim a phase is fillable in a way the allocator would not
+ * actually achieve, and the engine stays predictable.
+ *
+ * Deliberately NOT a maximum matching. A matching would find assignments the
+ * greedy allocator will not make, which is precisely the mistake that made an
+ * earlier planning tool report 5/5 when the composer managed 27/60.
+ */
+function laterPhasesFillable(
+  phases: readonly PlanPhase[],
+  candidatesByPhase: (phase: string) => readonly PlanModule[],
+  allocation: readonly number[],
+  scores: ReadonlyMap<string, number>,
+  from: number,
+  used: ReadonlySet<string>
+): boolean {
+  const taken = new Set(used);
+  for (let i = from; i < phases.length; i += 1) {
+    const next = pick(
+      candidatesByPhase(phases[i].phase).filter((m) => !taken.has(m.id)),
+      allocation[i],
+      scores
+    );
+    if (!next) return false;
+    taken.add(next.id);
+  }
+  return true;
 }
 
 /**
@@ -229,7 +291,21 @@ export function planPhases(
   for (let i = 0; i < phases.length; i += 1) {
     const phase = phases[i];
     const seconds = allocation[i];
-    const chosen = fillPhase(candidatesByPhase(phase.phase), seconds, scores, usedInSession);
+    const chosen = fillPhase(
+      candidatesByPhase(phase.phase),
+      seconds,
+      scores,
+      usedInSession,
+      (moduleId) =>
+        laterPhasesFillable(
+          phases,
+          candidatesByPhase,
+          allocation,
+          scores,
+          i + 1,
+          new Set([...usedInSession, moduleId])
+        )
+    );
 
     // A phase nothing fits cannot be filled at all — either nothing eligible is
     // short enough, or everything eligible has already been played earlier in

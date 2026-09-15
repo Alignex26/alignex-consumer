@@ -50,12 +50,12 @@ Last updated: 2026-09-09.
 | Edge functions | all four deployed and current — marker `d14eaf4f` |
 | Modules | **28 playable** (§7c) |
 | Audio | **84 renditions, all approved** — 28 modules x warm, clear, bright, at 0.92x |
-| Recipes | **51 of 60**; only `wound_up_home` at 600/900/1200s fails (§7c) |
+| Recipes | **60 of 60** — every recipe, duration and voice composes (§7d) |
 | Voices | `warm` (default), `clear`, `bright` all selectable. 7 more catalogued, unmapped |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content** |
 | Commercial | entitlement schema live; **RevenueCat absent, no purchase possible** |
 | Novelty | **active** (§6z) — recency applied, policy numbers still defaults |
-| Blocking | `wound_up_home` decision (§7c); **nothing heard on a device** |
+| Blocking | **nothing heard on a device** — the largest untested thing |
 
 **As of 2026-09-14 the product composes a real session.** Free text enters the
 safety gate, `nervous_ready` composes at all four durations from six approved
@@ -2803,6 +2803,60 @@ renditions   84, all approved, three voices at 0.92x
 composes     51/60
 ```
 
+## 7d. The allocator reserves — 60/60
+
+2026-09-15. **Every recipe composes at every duration in every voice.**
+
+```
+flat_go             300s  9    600s 14    900s 16   1200s 17
+nervous_ready       300s  9    600s 16    900s 18   1200s 18
+scattered_focused   300s 10    600s 15    900s 17   1200s 17
+wired_sleep         300s  7    600s  7    900s  7   1200s  7
+wound_up_home       300s  9    600s 11    900s 14   1200s 14
+```
+
+### The rule
+
+A phase takes its FIRST module unconditionally — that is what the phase is for.
+It takes **extras only while every later phase can still be filled**.
+
+That is the whole change. `fillPhase` gains an optional `mayTakeAnother` guard,
+defaulted permissive so every existing caller behaves identically, and
+`planPhases` supplies one look forward.
+
+### What it is not
+
+`laterPhasesFillable` walks the remaining phases **in order** and gives each the
+module `pick` would actually choose — the same function the real run uses. No
+search, no backtracking, no reordering.
+
+**Deliberately not a maximum matching.** A matching finds assignments the greedy
+allocator will never make, so it would report a phase fillable in a way the
+engine cannot achieve. That is precisely the mistake that had a planning tool
+reporting 5/5 while the composer managed 27/60 (§6w). The look-ahead has to be
+as short-sighted as the thing it is predicting.
+
+### Measured before it was written
+
+Prototyped in the planning simulator against the live library first:
+
+```
+greedy    51/60
+reserved  60/60
+```
+
+Nine fixed, **zero regressions** — and every already-working case produced the
+same module count, not merely the same verdict. Only then was it implemented.
+
+### What it replaced
+
+Fifteen further `ground`/`settle` modules, at 45 provider generations, whose only
+function would have been to out-supply a greedy phase. The engine change costs
+nothing per session and no content at all.
+
+The allocator is still greedy and still legible. It now declines to take a third
+helping when somebody after it has not eaten.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
@@ -3018,14 +3072,13 @@ a session can exist at all.
 
 ### The single next action
 
-**DECIDE WHAT TO DO ABOUT `wound_up_home` AT LONG DURATIONS** (§7c).
+**PLAY A SESSION ON A DEVICE.**
 
-Fifteen more `ground`/`settle` modules (45 generations), an allocator change
-(lookahead or reservation, no further content), or accept 51/60 with that one
-recipe offered at 300s only.
-
-After that, the largest untested thing in the product: **play a session on a
-device.** Nothing has ever been heard.
+Every recipe now composes at every duration in every voice (§7d). The chain is
+proven from free text to a persisted manifest with signed URLs to approved audio.
+Nobody has heard any of it, and that is now the largest untested thing in the
+product by a wide margin — timing, the sound layer, and the length of the
+silences between modules are all unknown.
 
 Earlier advice in this section — "author one `focus` module", then "one `settle`
 module", then "review the content pack" — is superseded. All are done.
