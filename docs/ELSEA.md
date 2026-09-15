@@ -38,22 +38,23 @@ Last updated: 2026-09-09.
 
 ## 1. Status at a glance
 
-*Read from the live project `alignex-consumer-dev`, 2026-09-14.*
+*Read from the live project `alignex-consumer-dev`, 2026-09-15.*
 
 | | |
 |---|---|
 | Branch | `main` |
-| Tests | 774 passing across 25 suites |
+| Tests | 815 passing across 27 suites |
 | TypeScript | clean (app and functions) |
 | Lint | clean |
 | Migrations | 18 written, **all applied** |
-| Edge functions | all four deployed and current — marker `8126ffda` |
+| Edge functions | all four deployed and current — marker `d14eaf4f` |
 | Modules | **18 playable**; +10 reaches 60/60 (§7a) |
 | Audio | **54 renditions, all approved** — 18 modules x warm, clear, bright, at 0.92x |
 | Recipes | **30 of 60** recipe/duration/voice combinations compose |
 | Voices | `warm` (default), `clear`, `bright` all selectable. 7 more catalogued, unmapped |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content** |
 | Commercial | entitlement schema live; **RevenueCat absent, no purchase possible** |
+| Novelty | **active** (§6z) — recency applied, policy numbers still defaults |
 | Blocking | 10 modules (§7a); **nothing heard on a device** |
 
 **As of 2026-09-14 the product composes a real session.** Free text enters the
@@ -393,7 +394,7 @@ short session and distributes surplus within the ceilings as time allows.
 
 All five span 300 / 600 / 900 / 1200 seconds, asserted in `recipes.test.ts`.
 
-### Tests — 774 across 25 suites
+### Tests — 815 across 27 suites
 
 | Suite | Covers |
 |---|---|
