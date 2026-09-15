@@ -48,13 +48,13 @@ Last updated: 2026-09-09.
 | Lint | clean |
 | Migrations | 18 written, **all applied** |
 | Edge functions | all four deployed and current — marker `8126ffda` |
-| Modules | **17 authored and playable**; target uncertain — see §6x |
+| Modules | **17 playable**; +12 reaches 60/60, +16 is launch quality (§6y) |
 | Audio | **51 renditions, all approved** — 17 modules x warm, clear, bright, at 0.92x |
 | Recipes | **27 of 60** recipe/duration/voice combinations compose |
 | Voices | `warm` (default), `clear`, `bright` all selectable. 7 more catalogued, unmapped |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content** |
 | Commercial | entitlement schema live; **RevenueCat absent, no purchase possible** |
-| Blocking | depth in `ground`/`prepare`/`reframe`/`settle`; **nothing heard on a device** |
+| Blocking | 12 modules (§6y); novelty inactive; **nothing heard on a device** |
 
 **As of 2026-09-14 the product composes a real session.** Free text enters the
 safety gate, `nervous_ready` composes at all four durations from six approved
@@ -873,7 +873,8 @@ library, and leave two rows to keep in step by hand.
 `module_renditions` carries only what is true of a particular recording: its
 storage path, its length and whether that take is approved.
 `intervention_modules.storage_path` is deprecated by the migration and made
-nullable; nothing reads it. Nothing was migrated because the library is empty.
+nullable; nothing reads it. Nothing was migrated: at the time the library was
+empty. (Superseded — see §1 for the current library.)
 
 ### Both approvals must hold
 
@@ -2003,7 +2004,7 @@ current — so a genuinely stale function is recorded as deployed and the next c
 says it is fine. It now derives the changed functions from the diff, and treats a
 `_shared/` change as staling every function that imports it.
 
-## 6t. The launch tranche produced — 15 renditions at 0.92x
+## 6t. The launch tranche produced — 15 renditions at 0.92x (historical)
 
 2026-09-14. The first full production run, and the first time any voice had
 complete coverage of the load-bearing set.
@@ -2275,7 +2276,12 @@ Clear failing all three times is consistent with it rendering quieter than warm
 and bright — it needs more gain, so it sits harder against both constraints and
 finds the narrow window first.
 
-## 6w. The readiness tool was wrong, and 47 modules is not enough
+## 6w. The readiness tool was wrong, and 47 modules is not enough (historical)
+
+**The sizing numbers in this section are superseded by §6y.** The incident it
+records — a tool reporting 5/5 when the composer managed 27/60 — is the reason
+§6y exists, and is kept for that. Its "72 modules" figure came from the same
+model that later drifted, and should not be planned against.
 
 2026-09-14. Three findings, and the first is a mistake of mine that had already
 been acted on.
@@ -2459,6 +2465,102 @@ The seven transition modules are sound work — approved, mastered first pass,
 durations synced. They are needed in the end state. They simply do not move
 anything on their own, and that should have been said before they were made.
 
+## 6y. The planning tool, rebuilt — and the real roadmap to 60/60
+
+2026-09-15. `library-sizing.mjs` is deleted. `scripts/plan-library.mjs`
+(`npm run plan`) replaces it.
+
+### What the old tool got wrong
+
+It answered "what does a balanced final library look like" and reported a JOINT
+configuration — `ground 6, prepare 6, reframe 6, settle 6, transition 7` — as if
+it were a work list. The first row was commissioned. **21 provider calls, zero
+coverage gain**, because none of those numbers means anything without the others.
+
+It was also drifting: 30/60 against a real 27/60. The single cause was that
+hypothetical modules shared one duration per family. Harmless while every family
+had one module; wrong the moment `transition` gained seven of varying length.
+
+And its validation gate was pinned to a hardcoded snapshot of a ten-module
+library. It kept passing after the library grew to seventeen, because it was
+checking facts rather than reality.
+
+### What the new tool does differently
+
+- **Live baseline every run.** It calls `compose` for all 20 recipe/duration
+  cases and uses that as truth. Without service-role access it **refuses to
+  plan** rather than fall back to a fixture.
+- **Refuses to recommend on disagreement.** The simulator must reproduce the live
+  baseline exactly; on any mismatch it exits without a recommendation.
+- **Exact per-module durations.** This alone closed the 30-versus-27 gap: the
+  simulator now agrees with the composer on all 20 cases.
+- **Duration shapes derived from recipe floors**, not one number per family, and
+  reported as "`settle` module, 60s or shorter" rather than "`settle` +1".
+- **Smallest gaining batch, breadth-first.** Size 1 is exhausted before size 2 is
+  tried, so a reported batch really is the smallest. Multi-module batches are
+  labelled `DEPENDENT BATCH — these only work together`.
+
+### The roadmap: 27/60 to 60/60 in twelve modules
+
+Every step gains, except the last two which are dependent pairs.
+
+```
+step  add                      before -> after   newly composable
+ 1    settle   <=60s            27 -> 30         wound_up_home@300s
+ 2    reframe  <=45s            30 -> 33         scattered_focused@600s
+ 3    reframe  <=30s            33 -> 36         scattered_focused@900s
+ 4    settle   <=45s            36 -> 39         wound_up_home@600s
+ 5    prepare  <=60s            39 -> 45         flat_go@300s, flat_go@600s
+ 6    prepare  <=60s            45 -> 48         flat_go@900s
+ 7    prepare  <=60s            48 -> 51         flat_go@1200s
+ 8    focus    <=60s            51 -> 54         scattered_focused@1200s
+ 9    settle   <=60s x2   DEP   54 -> 57         wound_up_home@900s
+10    settle   <=60s x2   DEP   57 -> 60         wound_up_home@1200s
+```
+
+**A. MINIMUM FUNCTIONAL — 12 new modules, 29 total.** `settle +6`,
+`prepare +3`, `reframe +2`, `focus +1`. 36 ElevenLabs generations across three
+voices.
+
+**B. LAUNCH QUALITY — 16 new modules, 33 total.** Defined as a measurable
+property rather than a feeling: **every phase has at least two possible
+modules**, so novelty has somewhere to go once it is switched on. Adds
+`activate`, `close`, `orient`, `release` singletons on top of A.
+
+**C. LONG-TERM DEPTH — not estimated, deliberately.** Sizing it needs evidence
+that does not exist: `module_effectiveness` has no rows. The canonical 47-module
+plan sits between B and C and is plausible as a first depth target, but nothing
+here justifies 47 over 40 or 55.
+
+### Repetition: depth is not the lever
+
+Thirty runs of every composable case, 600 sessions:
+
+```
+unique manifests                       one per case
+consecutive identical manifests        every repeat
+phases with one possible module        0/124 at launch quality
+modules in >=90% of sessions           3
+```
+
+**Every session of the same recipe at the same duration is identical, and always
+will be until novelty is activated.** Selection is deterministic — `pick` takes
+longest-then-key with all effectiveness scores neutral — so a thousand modules
+would still produce one manifest per case.
+
+This matters for how the remaining work is framed. Adding modules does not make
+repeated use feel fresh; it gives novelty somewhere to go when it is switched on.
+Novelty records history and does not apply it. **That is a separate piece of
+work, and it is the one that decides whether the product survives a second
+session**, not library size.
+
+### The allocator was not touched
+
+Its greedy, no-lookahead selection is what makes several of these cases fail, and
+a backtracking search would compose more with fewer modules. It is deliberately
+legible and was left alone. No allocator defect was found in this pass — the
+behaviour is as documented.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
@@ -2467,10 +2569,11 @@ Stated plainly so none is mistaken for finished work.
   and `wired_sleep` work at every duration; `scattered_focused` only at 300s;
   `flat_go` and `wound_up_home` at none. Depth is needed in `ground`, `prepare`,
   `reframe` and `settle` — all still singletons.
-- **The sizing model is not currently trustworthy** (§6x). It over-predicts by
-  three, its validation gate is pinned to a ten-module library that no longer
-  exists, and it assumes one duration per family. Fix it before commissioning
-  another authoring round.
+- ~~The sizing model is not trustworthy~~ — **fixed** (§6y). `npm run plan`
+  validates against the live composer every run and refuses to plan without it.
+- **Novelty is recorded but not applied.** Every session of the same recipe and
+  duration is identical, and more modules will not change that (§6y). This is
+  the work that decides whether a second session feels different.
 - **No session has ever been heard.** Composition and persistence are proven;
   device playback, outcome capture, novelty and replay are not.
 - **Manifest persistence is atomic but still unexercised.** It now writes
@@ -2577,43 +2680,21 @@ provider is chosen.
 
 ## 8b. Functional completion status
 
-**NOT FUNCTIONALLY COMPLETE.** One thing prevents it, and it is not code.
+**NOT FUNCTIONALLY COMPLETE.** Two things prevent it, and the first is not code.
 
-The definition agreed for this pass requires a real person to reach a real
-composed session and **hear approved audio**. `intervention_modules` is empty,
-so the composer returns `library_empty` and every session falls back to the
-silent catalogue path. A silent fallback does not count, a test fixture is not
-production content, and neither is treated as though it were.
+**Nobody has heard a session.** The chain is proven from free text through the
+safety gate, interpretation, composition, atomic manifest persistence and
+fingerprinting, with signed URLs to real approved audio (§6u). It has never been
+played on a device. Until it is, timing, the sound layer and the length of the
+silences between modules are all unknown.
 
-**Has the real session engine ever played an approved audio composition
-on-device? No.** It has never played any audio at all, because none exists.
+**27 of 60 recipe/duration/voice combinations compose.** `nervous_ready` and
+`wired_sleep` work at every duration; `scattered_focused` at 300s only; `flat_go`
+and `wound_up_home` at none. Twelve more modules close that (§6y).
 
-### What is genuinely working
-
-Verified by execution, not by the presence of code: the safety gate and its
-fail-closed behaviour; the flow graph and its route guards; the deployed
-composer's three failure paths; the recipe and module lockdown under RLS; the
-private audio bucket; the catalogue fallback end to end on a device, including
-pause; and the twenty recipe/duration composition cases through the real
-allocator.
-
-### What is built but unexercised
-
-Manifest persistence has never executed — it needs an approved module. The
-multi-segment player has never played a real manifest, for the same reason.
-The importer has never run against real content. The fingerprint path is
-deployed and its migration applied, but no fingerprint has been written yet:
-that needs a manifest, which needs an approved module.
-
-### The engine/audio distinction
-
-**ENGINE PROVEN** — all 20 recipe/duration cases compose through the real
-allocator, with no repeated module in any manifest.
-
-**REAL AUDIO PLAYBACK PROVEN** — no. Cannot be marked until approved content
-exists. These two are tracked separately on purpose: the first is an
-engineering result and is finished; the second is a content result and has not
-started.
+Everything else in the engine is green and exercised: safety, interpretation,
+all five recipes and four durations in tests, novelty and replay machinery, cost
+telemetry structure, atomic persistence.
 
 ## 8c. The critical path — what a playable session actually needs
 
@@ -2693,14 +2774,11 @@ a session can exist at all.
 
 ### The single next action
 
-**Author one `focus` module.** It is the cheapest route to the first composable
-recipe, and the first time ELSEA will play a real session end to end.
+**See §6y.** The next batch is one `settle` module, and the roadmap to 60/60 runs
+to twelve modules across four families.
 
-Then `ground` and `settle`, which unblock the remaining four recipes faster than
-anything else.
-
-Authoring and wellbeing approval are human work. The production path behind them
-is built and exercised: import, generate, master, approve, activate.
+This section's earlier advice — "author one `focus` module" — is superseded and
+was correct only while the library had five modules and no audio.
 
 ## 9. Working on it
 

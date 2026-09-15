@@ -59,8 +59,8 @@
     "coverage": "node scripts/coverage-report.mjs",
     "inspect:staged": "node scripts/inspect-staged.mjs",
     "recipes": "node scripts/recipe-readiness.mjs",
-    "sizing": "node scripts/library-sizing.mjs",
-    "sync:durations": "node scripts/sync-durations.mjs"
+    "sync:durations": "node scripts/sync-durations.mjs",
+    "plan": "node scripts/plan-library.mjs"
   },
   "private": true,
   "jest": {
