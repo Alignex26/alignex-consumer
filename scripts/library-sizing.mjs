@@ -275,3 +275,91 @@ console.log('  Durations here are drawn from what real modules measure. A librar
 console.log('  longer modules needs fewer of them and leaves less silence; a library of');
 console.log('  shorter ones needs more. Treat this as a floor, not a forecast.');
 console.log('');
+
+// --- 3. the cheapest library, not the tidiest ------------------------------
+//
+// Uniform depth is a convenient answer, not an efficient one: `prepare` is
+// referenced by phases in four recipes, `sleep` by one, so buying evenly
+// over-buys the quiet families to fix the busy ones.
+//
+// SEARCHED DOWNWARD, NOT UPWARD. Growing greedily from the current library does
+// not work and was tried: adding one module to a family usually unblocks
+// nothing on its own — two are often needed before anything changes — so a
+// greedy climb stalls at the first step and then spends its budget arbitrarily.
+// It piled 78 modules into one family and never passed 42/60.
+//
+// Starting from a size known to reach 60/60 and removing what is not needed is
+// a search over a feasible region rather than a hunt for one. Still greedy, so
+// not provably minimal, but every reported number is one the validated model
+// actually achieved.
+
+function scoreWith(counts) {
+  let ok = 0;
+  let total = 0;
+  for (const [, phases] of recipes) {
+    for (const d of DURATIONS) {
+      for (const v of VOICES) {
+        total += 1;
+        if (composes(phases, hypotheticalCounts(counts), d)) ok += 1;
+      }
+    }
+  }
+  return { ok, total };
+}
+
+function hypotheticalCounts(counts) {
+  const real = realLibrary();
+  const byFamily = new Map();
+  for (const family of FAMILIES) {
+    const seed = real.get(family) ?? [{ key: `${family}_0`, duration: medianDuration }];
+    const list = [];
+    for (let i = 0; i < (counts.get(family) ?? 0); i += 1) {
+      const base = seed[i % seed.length];
+      list.push({ key: `${family}_${String(i).padStart(2, '0')}`, duration: base.duration });
+    }
+    byFamily.set(family, list);
+  }
+  return byFamily;
+}
+
+if (answer === null) {
+  console.log('  No uniform size reached every combination, so there is nothing to reduce.');
+  console.log('');
+} else {
+  console.log('  Cheapest library — trimmed down from uniform depth:');
+  console.log('');
+
+  const counts = new Map(FAMILIES.map((f) => [f, answer]));
+  let trimmed = true;
+  while (trimmed) {
+    trimmed = false;
+    // Trim the largest families first: that is where the waste is.
+    const order = [...FAMILIES].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0));
+    for (const family of order) {
+      if ((counts.get(family) ?? 0) <= 0) continue;
+      const trial = new Map(counts);
+      trial.set(family, trial.get(family) - 1);
+      const s = scoreWith(trial);
+      if (s.ok === s.total) {
+        counts.set(family, trial.get(family));
+        trimmed = true;
+      }
+    }
+  }
+
+  const total = [...counts.values()].reduce((a, b) => a + b, 0);
+  const have = new Map(FAMILIES.map((f) => [f, (realLibrary().get(f) ?? []).length]));
+  const haveTotal = [...have.values()].reduce((a, b) => a + b, 0);
+
+  console.log('    family        have   need   to write');
+  for (const family of FAMILIES) {
+    const need = counts.get(family) ?? 0;
+    const gap = Math.max(0, need - (have.get(family) ?? 0));
+    console.log(`    ${family.padEnd(12)} ${String(have.get(family) ?? 0).padStart(4)}   ${String(need).padStart(4)}   ${String(gap).padStart(8)}${gap === 0 ? '' : ''}`);
+  }
+  const toWrite = FAMILIES.reduce((sum, f) => sum + Math.max(0, (counts.get(f) ?? 0) - (have.get(f) ?? 0)), 0);
+  console.log('');
+  console.log(`    ${total} modules total, ${haveTotal} exist, ${toWrite} TO WRITE`);
+  console.log(`    (uniform depth would be ${answer * FAMILIES.length}, i.e. ${answer * FAMILIES.length - haveTotal} to write)`);
+  console.log('');
+}

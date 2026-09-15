@@ -48,13 +48,13 @@ Last updated: 2026-09-09.
 | Lint | clean |
 | Migrations | 18 written, **all applied** |
 | Edge functions | all four deployed and current — marker `8126ffda` |
-| Modules | **10 authored and playable**; ~72 needed (§6w) |
-| Audio | **30 renditions, all approved** — 10 modules x warm, clear, bright, at 0.92x |
+| Modules | **17 authored and playable**; target uncertain — see §6x |
+| Audio | **51 renditions, all approved** — 17 modules x warm, clear, bright, at 0.92x |
 | Recipes | **27 of 60** recipe/duration/voice combinations compose |
 | Voices | `warm` (default), `clear`, `bright` all selectable. 7 more catalogued, unmapped |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content** |
 | Commercial | entitlement schema live; **RevenueCat absent, no purchase possible** |
-| Blocking | library depth (§6w); **nothing has been heard on a device** |
+| Blocking | depth in `ground`/`prepare`/`reframe`/`settle`; **nothing heard on a device** |
 
 **As of 2026-09-14 the product composes a real session.** Free text enters the
 safety gate, `nervous_ready` composes at all four durations from six approved
@@ -2384,15 +2384,93 @@ Version rows are untouched: `intervention_module_versions.duration_seconds` is
 part of a version's identity and the append-only trigger refuses to change it.
 A version records what was approved, not what was later measured.
 
+## 6x. Seven modules that bought nothing, and a model that drifted
+
+2026-09-15. The `transition` family was authored, generated and approved in three
+voices — 7 modules, 21 renditions, 21/21 mastered first pass. Composition did not
+move: **27/60 before, 27/60 after.**
+
+### The mistake
+
+`library-sizing.mjs` reported a target of `ground 6, prepare 6, reframe 6,
+settle 6, transition 7` and "27 to write". That is a JOINT configuration. Every
+number in it assumes the others are also met.
+
+`wound_up_home` fails because `ground`, `settle` and `reframe` are singletons.
+Adding depth to `transition` cannot fill a phase that starves elsewhere. The
+probe run before authoring had already shown this — transition 0 through 6 all
+give 57/60, and only 7 reaches 60/60 **while the other four sit at 6** — and it
+was read as "transition needs 7" without carrying the condition.
+
+The table was then presented as a work list. The product owner reasonably picked
+the first row, and 21 provider calls produced no visible progress.
+
+**The lesson is about how a target is reported, not about the arithmetic.** A
+joint optimum has no meaningful per-row ordering, and presenting it as a list
+invites exactly this. Any future sizing output should either state the
+dependency or give an order that yields incremental gains.
+
+### The model has drifted from the composer
+
+```
+model on the current library     30/60
+composer on the current library  27/60
+```
+
+Two causes, both mine:
+
+**The validation gate is checking stale facts.** `GROUND_TRUTH` is hardcoded to
+the ten-module state of 2026-09-14. The library is now seventeen modules. The
+gate still passes, because it is validating against a library that no longer
+exists — a check that reports success while confirming the wrong thing, which is
+the failure this document has now recorded four times, twice in tooling written
+here.
+
+**Hypothetical modules share one duration per family.** That was harmless when
+every family had exactly one module. The seven transition modules run 16.4–22.7s,
+and varied lengths change how `fillPhase` chains them.
+
+So the per-family targets are soft. They should not be used to commission another
+sixty generations as they stand.
+
+### What to fix before authoring more
+
+1. **Validate against live `compose` calls**, not a frozen table. The tool that
+   answers "is the library finished" must re-derive its own ground truth every
+   run, or it decays into a confident guess.
+2. **Give hypothetical modules a realistic duration spread**, drawn from the
+   distribution of real ones rather than a single value per family.
+3. **Report an order, not just a target** — either state that the configuration
+   is joint, or compute a sequence where each step gains something measurable.
+
+### State
+
+```
+modules      17 authored, content-approved and playable
+renditions   51, all approved, three voices at 0.92x
+families     transition 7, ten others 1 each, release 0
+composes     27/60 recipe/duration/voice combinations
+```
+
+`nervous_ready` and `wired_sleep` work at every duration; `scattered_focused` at
+300s only; `flat_go` and `wound_up_home` at none.
+
+The seven transition modules are sound work — approved, mastered first pass,
+durations synced. They are needed in the end state. They simply do not move
+anything on their own, and that should have been said before they were made.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
 
 - **Only 27 of 60 recipe/duration/voice combinations compose.** `nervous_ready`
   and `wired_sleep` work at every duration; `scattered_focused` only at 300s;
-  `flat_go` and `wound_up_home` at none. The library needs roughly **72 modules**
-  (six per family), not the 47 planned — see §6w. Depth in the contested
-  families matters more than breadth.
+  `flat_go` and `wound_up_home` at none. Depth is needed in `ground`, `prepare`,
+  `reframe` and `settle` — all still singletons.
+- **The sizing model is not currently trustworthy** (§6x). It over-predicts by
+  three, its validation gate is pinned to a ten-module library that no longer
+  exists, and it assumes one duration per family. Fix it before commissioning
+  another authoring round.
 - **No session has ever been heard.** Composition and persistence are proven;
   device playback, outcome capture, novelty and replay are not.
 - **Manifest persistence is atomic but still unexercised.** It now writes

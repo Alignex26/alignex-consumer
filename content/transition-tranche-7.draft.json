@@ -1,0 +1,93 @@
+[
+  {
+    "module_key": "transition_day_closed_short",
+    "family": "transition",
+    "technique_key": "deliberate_day_closure",
+    "storage_path": "modules/transition/transition_day_closed_short.m4a",
+    "duration_seconds": 26,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "The working part of the day is finished. Not because everything got done \u2014 it rarely does \u2014 but because you have stopped. That is enough to make it over. Whatever is still open was always going to be still open. It belongs to tomorrow now, and tomorrow has its own hours for it.",
+    "content_approved": true
+  },
+  {
+    "module_key": "transition_off_duty_short",
+    "family": "transition",
+    "technique_key": "release_of_responsibility",
+    "storage_path": "modules/transition/transition_off_duty_short.m4a",
+    "duration_seconds": 24,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "Right now, nobody is waiting on you. Nothing is being decided that needs your answer in the next few minutes. You can be off duty. That isn't neglect, and it isn't laziness. It is the part of the day where you are allowed to not be useful to anyone.",
+    "content_approved": true
+  },
+  {
+    "module_key": "transition_unfinished_short",
+    "family": "transition",
+    "technique_key": "unfinished_permission",
+    "storage_path": "modules/transition/transition_unfinished_short.m4a",
+    "duration_seconds": 25,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "There are things you didn't finish. Carrying them around this evening will not move them forward by a single step. They will be exactly where you left them. You can put them down without losing them. Picking them up again is a decision for a different hour.",
+    "content_approved": true
+  },
+  {
+    "module_key": "transition_threshold_short",
+    "family": "transition",
+    "technique_key": "threshold_marking",
+    "storage_path": "modules/transition/transition_threshold_short.m4a",
+    "duration_seconds": 23,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "You have come from one part of the day into another. Sometimes that change happens without being noticed, and the old part follows you in. So notice it now. Behind you, the day you were having. Here, something else. You are on this side of it.",
+    "content_approved": true
+  },
+  {
+    "module_key": "transition_urgency_fades_short",
+    "family": "transition",
+    "technique_key": "urgency_reappraisal",
+    "storage_path": "modules/transition/transition_urgency_fades_short.m4a",
+    "duration_seconds": 27,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "Think of something that felt urgent this morning. Most of it has already quietly stopped mattering. That is not a failure of attention \u2014 it is how urgency works. It arrives loud and leaves without telling you. Some of what feels loud right now is doing the same thing already.",
+    "content_approved": true
+  },
+  {
+    "module_key": "transition_different_room_short",
+    "family": "transition",
+    "technique_key": "context_change_noticing",
+    "storage_path": "modules/transition/transition_different_room_short.m4a",
+    "duration_seconds": 22,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "Where you are now is not where you were. Different light, different sounds, different air. None of it is asking you for anything. The place you have just left is still going on somewhere without you, and it does not need watching.",
+    "content_approved": true
+  },
+  {
+    "module_key": "transition_no_hurry_short",
+    "family": "transition",
+    "technique_key": "unhurried_arrival",
+    "storage_path": "modules/transition/transition_no_hurry_short.m4a",
+    "duration_seconds": 24,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "You don't have to arrive all at once. Part of you is still back in the day, and that part will catch up in its own time. There is no version of this where you switch over cleanly in a second. Being halfway here is a normal place to be for a while.",
+    "content_approved": true
+  }
+]

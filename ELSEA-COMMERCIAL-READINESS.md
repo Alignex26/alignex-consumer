@@ -3,11 +3,12 @@
 **Status: NOT release ready.** This document is written to be trusted, which
 means it says what is missing at least as clearly as what is built.
 
-The honest summary in one line: **one recipe composes a real session end to end,
-four do not, and nobody has heard any of it.** Six modules are live with approved
-audio in three voices; `nervous_ready` composes, persists and fingerprints
-correctly. Four more modules make the remaining recipes composable. Nothing in
-the commercial layer changes that, and no amount of it can.
+The honest summary in one line: **27 of 60 possible sessions compose, and nobody
+has heard any of them.** Seventeen modules are live with approved audio in three
+voices; `nervous_ready` and `wired_sleep` work at every duration. The remaining
+gap is depth in four families, and the tool that estimates how much depth is
+currently unreliable — see `docs/ELSEA.md` §6x. Nothing in the commercial layer
+changes that, and no amount of it can.
 
 Last updated 2026-09-14, after the launch-tranche production run. Live figures
 read from `alignex-consumer-dev` with `npm run coverage` and `npm run recipes`.
@@ -166,11 +167,11 @@ created or approved by me.
 | | |
 |---|---|
 | Planned | **47** |
-| Authored (English) | **6** |
-| Content-approved (English) | **6** |
-| With any approved audio | **6** — all of them, in all three voices |
-| Playable modules | **6** |
-| **Recipes composable** | **1 of 5** — `nervous_ready` |
+| Authored (English) | **17** |
+| Content-approved (English) | **17** |
+| With any approved audio | **17** — all of them, in all three voices |
+| Playable modules | **17** |
+| **Compositions that succeed** | **27 of 60** recipe/duration/voice |
 
 The five are the `nervous_ready` tranche: `nr_arrive_short`,
 `nr_regulate_short`, `nr_reframe_short`, `nr_prepare_short`, `nr_close_short` —
