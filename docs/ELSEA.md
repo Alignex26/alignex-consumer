@@ -48,14 +48,14 @@ Last updated: 2026-09-09.
 | Lint | clean |
 | Migrations | 18 written, **all applied** |
 | Edge functions | all four deployed and current — marker `d14eaf4f` |
-| Modules | **18 playable**; +10 drafted reaches 51/60 (§7b) |
-| Audio | **54 renditions, all approved** — 18 modules x warm, clear, bright, at 0.92x |
-| Recipes | **30 of 60** recipe/duration/voice combinations compose |
+| Modules | **28 playable** (§7c) |
+| Audio | **84 renditions, all approved** — 28 modules x warm, clear, bright, at 0.92x |
+| Recipes | **51 of 60**; only `wound_up_home` at 600/900/1200s fails (§7c) |
 | Voices | `warm` (default), `clear`, `bright` all selectable. 7 more catalogued, unmapped |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content** |
 | Commercial | entitlement schema live; **RevenueCat absent, no purchase possible** |
 | Novelty | **active** (§6z) — recency applied, policy numbers still defaults |
-| Blocking | content pack awaiting review (§7b); **nothing heard on a device** |
+| Blocking | `wound_up_home` decision (§7c); **nothing heard on a device** |
 
 **As of 2026-09-14 the product composes a real session.** Free text enters the
 safety gate, `nervous_ready` composes at all four durations from six approved
@@ -2755,6 +2755,54 @@ repeated openings or closings anywhere in the library.
 **Everything past 30/60 in this section is PREDICTED UNTIL IMPORTED AND
 MASTERED.**
 
+## 7c. The functional pack landed — 51/60, and the wall is real
+
+2026-09-15. Ten modules approved, imported, generated and mastered in three
+voices. **30/60 to 51/60, exactly as predicted.** Second consecutive forecast to
+hold.
+
+```
+flat_go             all four durations    9-17 modules per session
+nervous_ready       all four durations    9-18
+scattered_focused   all four durations   10-17
+wired_sleep         all four durations    7
+wound_up_home       300s only             9
+```
+
+`flat_go` and `scattered_focused` compose at every duration for the first time.
+Sessions are also markedly richer: `nervous_ready@1200s` now draws on 18 modules
+where it drew on 8.
+
+**30 generations, 30 passes, no regenerations.** One module needed four ladder
+rungs; the rest passed first try. ~3,200 characters per voice.
+
+### The wall, confirmed by the live composer
+
+`wound_up_home` at 600s, 900s and 1200s still fails — the nine combinations §7b
+predicted would remain. Not a missing family: its `settle` phase is starved
+because `reconnect_to_now` runs immediately before it, is allocated 346 seconds
+at 1200s, and accepts the same families. It chains through the shared pool.
+
+Measured: fifteen further `ground` or `settle` modules clear it; eight do not.
+Those fifteen would exist only to out-supply a greedy phase, at 45 generations.
+
+**Three options, none taken:**
+
+- author fifteen more modules — 45 generations, and genuine depth for novelty;
+- give the allocator lookahead or a reservation rule — a code change, no further
+  content, and the engine stops being purely greedy;
+- accept 51/60 and offer `wound_up_home` at 300s only.
+
+The allocator remains deliberately greedy and legible and has not been touched.
+
+### State
+
+```
+modules      28 playable
+renditions   84, all approved, three voices at 0.92x
+composes     51/60
+```
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
@@ -2970,17 +3018,17 @@ a session can exist at all.
 
 ### The single next action
 
-**PRODUCT-OWNER REVIEW OF THE REMAINING ENGLISH FUNCTIONAL CONTENT PACK.**
+**DECIDE WHAT TO DO ABOUT `wound_up_home` AT LONG DURATIONS** (§7c).
 
-`docs/english-functional-completion-pack.md` — ten drafts, one review pass. On
-approval: import, then 30 ElevenLabs calls across three voices, taking live
-coverage from 30/60 to a predicted 51/60.
+Fifteen more `ground`/`settle` modules (45 generations), an allocator change
+(lookahead or reservation, no further content), or accept 51/60 with that one
+recipe offered at 300s only.
 
-Then a decision on `wound_up_home` at long durations (§7b): fifteen more modules,
-an allocator change, or accept 51/60.
+After that, the largest untested thing in the product: **play a session on a
+device.** Nothing has ever been heard.
 
 Earlier advice in this section — "author one `focus` module", then "one `settle`
-module" — is superseded. Both exist.
+module", then "review the content pack" — is superseded. All are done.
 
 ## 9. Working on it
 

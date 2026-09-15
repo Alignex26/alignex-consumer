@@ -1,5 +1,10 @@
 # ELSEA — English functional completion pack
 
+> **APPROVED AND SHIPPED, 2026-09-15.** All ten were approved by the product
+> owner, generated in warm, clear and bright, mastered to specification and
+> approved. Live coverage went 30/60 to 51/60 exactly as predicted. This document
+> is kept as the record of what was reviewed. See `docs/ELSEA.md` §7c.
+
 **Ten drafts for one review pass.** None is approved, none has audio, none is
 playable. Nothing here has cost a provider call.
 
@@ -11,16 +16,16 @@ Drafted 2026-09-15 against the live library (18 playable modules, 30/60).
 
 | # | module | family | ceiling | est. | predicted gain | content approval | audio |
 |---|---|---|---:|---:|---|---|---|
-| 1 | `prepare_smallest_step_short` | prepare | 45s | 30s | +3 | **PENDING PRODUCT OWNER** | not generated |
-| 2 | `prepare_done_before_short` | prepare | 45s | 27s | 0 — see note | **PENDING PRODUCT OWNER** | not generated |
-| 3 | `prepare_what_matters_short` | prepare | 45s | 29s | +3 | **PENDING PRODUCT OWNER** | not generated |
-| 4 | `prepare_ready_enough_short` | prepare | 45s | 29s | +3 | **PENDING PRODUCT OWNER** | not generated |
-| 5 | `prepare_afterwards_short` | prepare | 45s | 30s | 0 — see note | **PENDING PRODUCT OWNER** | not generated |
-| 6 | `focus_one_question_short` | focus | 30s | 19s | 0 — see note | **PENDING PRODUCT OWNER** | not generated |
-| 7 | `focus_close_the_rest_short` | focus | 30s | 23s | +3 | **PENDING PRODUCT OWNER** | not generated |
-| 8 | `focus_return_is_the_skill_short` | focus | 30s | 22s | +3 | **PENDING PRODUCT OWNER** | not generated |
-| 9 | `focus_next_ten_minutes_short` | focus | 30s | 22s | +3 | **PENDING PRODUCT OWNER** | not generated |
-| 10 | `focus_any_direction_short` | focus | 30s | 22s | +3 | **PENDING PRODUCT OWNER** | not generated |
+| 1 | `prepare_smallest_step_short` | prepare | 45s | 30s | +3 | APPROVED 2026-09-15 | approved, 3 voices |
+| 2 | `prepare_done_before_short` | prepare | 45s | 27s | 0 — see note | APPROVED 2026-09-15 | approved, 3 voices |
+| 3 | `prepare_what_matters_short` | prepare | 45s | 29s | +3 | APPROVED 2026-09-15 | approved, 3 voices |
+| 4 | `prepare_ready_enough_short` | prepare | 45s | 29s | +3 | APPROVED 2026-09-15 | approved, 3 voices |
+| 5 | `prepare_afterwards_short` | prepare | 45s | 30s | 0 — see note | APPROVED 2026-09-15 | approved, 3 voices |
+| 6 | `focus_one_question_short` | focus | 30s | 19s | 0 — see note | APPROVED 2026-09-15 | approved, 3 voices |
+| 7 | `focus_close_the_rest_short` | focus | 30s | 23s | +3 | APPROVED 2026-09-15 | approved, 3 voices |
+| 8 | `focus_return_is_the_skill_short` | focus | 30s | 22s | +3 | APPROVED 2026-09-15 | approved, 3 voices |
+| 9 | `focus_next_ten_minutes_short` | focus | 30s | 22s | +3 | APPROVED 2026-09-15 | approved, 3 voices |
+| 10 | `focus_any_direction_short` | focus | 30s | 22s | +3 | APPROVED 2026-09-15 | approved, 3 voices |
 
 Gains are cumulative and order-dependent, expressed in combinations (each case
 counts three, once per voice). **Three modules show zero at their position** —
@@ -69,7 +74,7 @@ threshold 18%. No repeated openings or closings anywhere in the library.
 
 68 words &nbsp;·&nbsp; ~29.6s at 0.92x &nbsp;·&nbsp; ceiling 45s &nbsp;·&nbsp; headroom 15.4s
 
-**Status:** DRAFT · CONTENT APPROVAL REQUIRED · AUDIO NOT GENERATED · MODULE NOT PLAYABLE
+**Status:** APPROVED · AUDIO GENERATED IN THREE VOICES · MODULE PLAYABLE
 
 ---
 
@@ -87,7 +92,7 @@ threshold 18%. No repeated openings or closings anywhere in the library.
 
 63 words &nbsp;·&nbsp; ~27.3s at 0.92x &nbsp;·&nbsp; ceiling 45s &nbsp;·&nbsp; headroom 17.7s
 
-**Status:** DRAFT · CONTENT APPROVAL REQUIRED · AUDIO NOT GENERATED · MODULE NOT PLAYABLE
+**Status:** APPROVED · AUDIO GENERATED IN THREE VOICES · MODULE PLAYABLE
 
 ---
 
@@ -105,7 +110,7 @@ threshold 18%. No repeated openings or closings anywhere in the library.
 
 66 words &nbsp;·&nbsp; ~29.4s at 0.92x &nbsp;·&nbsp; ceiling 45s &nbsp;·&nbsp; headroom 15.6s
 
-**Status:** DRAFT · CONTENT APPROVAL REQUIRED · AUDIO NOT GENERATED · MODULE NOT PLAYABLE
+**Status:** APPROVED · AUDIO GENERATED IN THREE VOICES · MODULE PLAYABLE
 
 ---
 
@@ -123,7 +128,7 @@ threshold 18%. No repeated openings or closings anywhere in the library.
 
 66 words &nbsp;·&nbsp; ~29.3s at 0.92x &nbsp;·&nbsp; ceiling 45s &nbsp;·&nbsp; headroom 15.7s
 
-**Status:** DRAFT · CONTENT APPROVAL REQUIRED · AUDIO NOT GENERATED · MODULE NOT PLAYABLE
+**Status:** APPROVED · AUDIO GENERATED IN THREE VOICES · MODULE PLAYABLE
 
 ---
 
@@ -141,7 +146,7 @@ threshold 18%. No repeated openings or closings anywhere in the library.
 
 73 words &nbsp;·&nbsp; ~30.1s at 0.92x &nbsp;·&nbsp; ceiling 45s &nbsp;·&nbsp; headroom 14.9s
 
-**Status:** DRAFT · CONTENT APPROVAL REQUIRED · AUDIO NOT GENERATED · MODULE NOT PLAYABLE
+**Status:** APPROVED · AUDIO GENERATED IN THREE VOICES · MODULE PLAYABLE
 
 ---
 
@@ -159,7 +164,7 @@ threshold 18%. No repeated openings or closings anywhere in the library.
 
 42 words &nbsp;·&nbsp; ~19.2s at 0.92x &nbsp;·&nbsp; ceiling 30s &nbsp;·&nbsp; headroom 10.8s
 
-**Status:** DRAFT · CONTENT APPROVAL REQUIRED · AUDIO NOT GENERATED · MODULE NOT PLAYABLE
+**Status:** APPROVED · AUDIO GENERATED IN THREE VOICES · MODULE PLAYABLE
 
 ---
 
@@ -177,7 +182,7 @@ threshold 18%. No repeated openings or closings anywhere in the library.
 
 55 words &nbsp;·&nbsp; ~23.4s at 0.92x &nbsp;·&nbsp; ceiling 30s &nbsp;·&nbsp; headroom 6.6s
 
-**Status:** DRAFT · CONTENT APPROVAL REQUIRED · AUDIO NOT GENERATED · MODULE NOT PLAYABLE
+**Status:** APPROVED · AUDIO GENERATED IN THREE VOICES · MODULE PLAYABLE
 
 ---
 
@@ -195,7 +200,7 @@ threshold 18%. No repeated openings or closings anywhere in the library.
 
 53 words &nbsp;·&nbsp; ~22.0s at 0.92x &nbsp;·&nbsp; ceiling 30s &nbsp;·&nbsp; headroom 8.0s
 
-**Status:** DRAFT · CONTENT APPROVAL REQUIRED · AUDIO NOT GENERATED · MODULE NOT PLAYABLE
+**Status:** APPROVED · AUDIO GENERATED IN THREE VOICES · MODULE PLAYABLE
 
 ---
 
@@ -213,7 +218,7 @@ threshold 18%. No repeated openings or closings anywhere in the library.
 
 53 words &nbsp;·&nbsp; ~22.1s at 0.92x &nbsp;·&nbsp; ceiling 30s &nbsp;·&nbsp; headroom 7.9s
 
-**Status:** DRAFT · CONTENT APPROVAL REQUIRED · AUDIO NOT GENERATED · MODULE NOT PLAYABLE
+**Status:** APPROVED · AUDIO GENERATED IN THREE VOICES · MODULE PLAYABLE
 
 ---
 
@@ -231,7 +236,7 @@ threshold 18%. No repeated openings or closings anywhere in the library.
 
 50 words &nbsp;·&nbsp; ~22.4s at 0.92x &nbsp;·&nbsp; ceiling 30s &nbsp;·&nbsp; headroom 7.6s
 
-**Status:** DRAFT · CONTENT APPROVAL REQUIRED · AUDIO NOT GENERATED · MODULE NOT PLAYABLE
+**Status:** APPROVED · AUDIO GENERATED IN THREE VOICES · MODULE PLAYABLE
 
 ---
 
