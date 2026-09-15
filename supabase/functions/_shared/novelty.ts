@@ -119,17 +119,38 @@ export function applyRecency(
   const adjusted = new Map(scores);
   const window = recent.slice(0, policy.lookbackSessions);
 
+  // MOST RECENT OCCURRENCE ONLY. The penalty is not accumulated over every
+  // session a module appears in, and this is the difference between the
+  // documented behaviour and a real defect found when novelty was first
+  // switched on.
+  //
+  // Accumulating, a module heard in all five sessions of the window lost
+  // 0.15 + 0.12 + 0.09 + 0.06 + 0.03 = 0.45. Something rated 9/10 fell to 0.45
+  // — BELOW an unrated module at 0.50 — and stopped being offered. That is
+  // exactly the trade `maxPenalty` is documented as never making, and it
+  // breaks rule 8: the person hears what works for them.
+  //
+  // The existing test for this invariant passed only because it used three
+  // sessions and a perfect 1.0 score. At five sessions and 0.9 it fails.
+  //
+  // Taking only the most recent occurrence keeps the total penalty bounded by
+  // `maxPenalty`, which is what "deliberately smaller than the gap between a
+  // well-rated and an unrated module" requires to be true.
+  const firstSeenAt = new Map<string, number>();
   window.forEach((session, index) => {
+    for (const moduleId of session) {
+      if (!firstSeenAt.has(moduleId)) firstSeenAt.set(moduleId, index);
+    }
+  });
+
+  for (const [moduleId, index] of firstSeenAt) {
     // Most recent session carries the full penalty; the oldest in the window
     // carries almost none.
     const recencyWeight = (window.length - index) / window.length;
     const penalty = policy.maxPenalty * recencyWeight;
-
-    for (const moduleId of session) {
-      const current = adjusted.get(moduleId) ?? neutralScore;
-      adjusted.set(moduleId, Math.max(policy.penaltyFloor, current - penalty));
-    }
-  });
+    const current = adjusted.get(moduleId) ?? neutralScore;
+    adjusted.set(moduleId, Math.max(policy.penaltyFloor, current - penalty));
+  }
 
   return adjusted;
 }

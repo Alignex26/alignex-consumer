@@ -54,7 +54,7 @@ Last updated: 2026-09-09.
 | Voices | `warm` (default), `clear`, `bright` all selectable. 7 more catalogued, unmapped |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content** |
 | Commercial | entitlement schema live; **RevenueCat absent, no purchase possible** |
-| Blocking | 12 modules (§6y); novelty inactive; **nothing heard on a device** |
+| Blocking | 12 modules (§6y); **nothing heard on a device** |
 
 **As of 2026-09-14 the product composes a real session.** Free text enters the
 safety gate, `nervous_ready` composes at all four durations from six approved
@@ -2561,6 +2561,83 @@ a backtracking search would compose more with fewer modules. It is deliberately
 legible and was left alone. No allocator defect was found in this pass — the
 behaviour is as documented.
 
+## 6z. Novelty activated — and the defect it was hiding
+
+2026-09-15. Recency weighting is applied. `compose` now reads the person's last
+five persisted manifests and penalises what they have just heard.
+
+### It had been complete and uncalled for days
+
+`_shared/novelty.ts` held `applyRecency`, `isRecentlySeen` and a policy, all
+unit-tested. `compose` imported exactly one function from it — the fingerprint —
+and the comment said so plainly: *"Recorded, not acted upon."*
+
+The consequence was measurable and severe: **every session of the same recipe at
+the same duration returned the same manifest, for ever.** 600 simulated sessions
+produced one manifest per case, and a thousand modules would not have changed it.
+Selection is deterministic with neutral scores.
+
+### The wiring
+
+- `CompositionInput` gains `recent` — module ids per recent session, most recent
+  first. The engine stays pure and testable without a database.
+- Scores are `applyRecency(scoresFrom(effectiveness), recent)`. **Effectiveness
+  first, recency on top**; the reverse would let freshness decide outright.
+- The Edge Function reads the last `lookbackSessions` manifests with their
+  segment module ids.
+
+**History comes from manifests, not outcomes.** A session counts as heard whether
+or not it was rated, and rating is optional — keying novelty to outcomes would
+make unrated sessions invisible to it.
+
+Signed-out people pass no history and compose exactly as before.
+
+### The defect switching it on exposed
+
+`applyRecency` subtracted a penalty for EVERY session a module appeared in:
+
+```
+score 0.90, heard in all five sessions of the window
+0.90 -> 0.75 -> 0.63 -> 0.54 -> 0.48 -> 0.45
+```
+
+A module rated nine out of ten fell to **0.45, below an unrated module at 0.50**,
+and stopped being offered. The policy documents `maxPenalty` as *"deliberately
+smaller than the gap between a well-rated and an unrated module, so novelty
+reorders equals and never buries something that works"* — and the code did the
+opposite. It breaks rule 8: the person hears what works for them.
+
+**The existing test for that invariant passed for the wrong reason.** It used
+three sessions and a perfect 1.0, which survives an accumulating penalty; five
+sessions and a realistic 0.9 does not. A check that confirms the wrong thing by
+choosing a case that works — the fifth instance recorded in this document.
+
+The fix takes only the MOST RECENT occurrence, which is what the documentation
+describes and bounds the total penalty by `maxPenalty`. The test now fills the
+window with a score a real module could earn, and a second test asserts the bound
+directly.
+
+This was dormant purely because nothing called it. It would have shipped as
+"novelty works" and quietly stopped serving people their most effective modules.
+
+### Still defaults, not decisions
+
+`lookbackSessions: 5`, `maxPenalty: 0.15`, `penaltyFloor: 0.05` remain defaults
+chosen so the mechanism could be exercised. Nothing here makes them product
+decisions, and `novelty-simulation.test.ts` exists so they can be decided from
+evidence.
+
+### What it does and does not buy
+
+Novelty reorders modules that are otherwise equal, so it only produces variety
+where a phase has more than one candidate. Several phases in the composable
+recipes accept two families and so have a choice today; most single-family phases
+do not. **Depth and novelty are complements**: depth gives novelty somewhere to
+go, novelty is what makes the depth felt.
+
+`isRecentlySeen` remains uncalled. Retrying an identical composition is a
+different mechanism and was left for a later pass.
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
@@ -2571,9 +2648,11 @@ Stated plainly so none is mistaken for finished work.
   `reframe` and `settle` — all still singletons.
 - ~~The sizing model is not trustworthy~~ — **fixed** (§6y). `npm run plan`
   validates against the live composer every run and refuses to plan without it.
-- **Novelty is recorded but not applied.** Every session of the same recipe and
-  duration is identical, and more modules will not change that (§6y). This is
-  the work that decides whether a second session feels different.
+- ~~Novelty is recorded but not applied~~ — **activated** (§6z), and it exposed a
+  defect that would have buried well-rated modules. Policy numbers remain
+  defaults rather than product decisions.
+- **`isRecentlySeen` is still uncalled.** Retrying an identical composition is a
+  separate mechanism from recency weighting and was left for a later pass.
 - **No session has ever been heard.** Composition and persistence are proven;
   device playback, outcome capture, novelty and replay are not.
 - **Manifest persistence is atomic but still unexercised.** It now writes

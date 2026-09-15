@@ -31,6 +31,9 @@ declare module 'jsr:@supabase/supabase-js@2' {
     // hand-written and cover only what the functions actually call, so a real
     // supabase-js method is missing here until something needs it.
     in(column: string, values: readonly unknown[]): Filter<T>;
+    // Added 2026-09-15, when recency weighting was activated and needed a
+    // bounded lookback over a person's recent manifests.
+    limit(count: number): Filter<T>;
     maybeSingle(): PostgrestResult<T>;
     order(column: string, options?: { ascending?: boolean }): Filter<T>;
     select(columns?: string): Filter<T>;

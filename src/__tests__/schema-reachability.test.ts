@@ -30,6 +30,7 @@ const root = join(__dirname, '..', '..');
 const read = (...parts: string[]) => readFileSync(join(root, ...parts), 'utf8');
 
 const COMPOSER = read('supabase', 'functions', 'compose', 'index.ts');
+const SHARED_COMPOSE = read('supabase', 'functions', '_shared', 'compose.ts');
 const IMPORTER = read('scripts', 'modules-import.mjs');
 const VALIDATOR = read('scripts', 'modules-validate.mjs');
 const RPC = read('supabase', 'migrations', '20260909180000_persist_fingerprint.sql');
@@ -86,30 +87,50 @@ describe('session_manifests.fingerprint is reachable', () => {
   });
 });
 
-describe('recording is not the same as applying a policy', () => {
+describe('recency is applied, and bounded by what was decided', () => {
   /**
-   * The distinction this whole change rests on. Storing what was composed is
-   * bookkeeping. Deprioritising a module because it was heard recently is a
-   * product decision — the lookback window and the novelty-versus-
-   * effectiveness weighting are not decided, and the defaults in
-   * `novelty.ts` are explicitly placeholders.
+   * THIS BLOCK USED TO ASSERT THE OPPOSITE, and was right to at the time: while
+   * the lookback and weighting were undecided, applying them would have been
+   * inventing a product decision, so the composer computed a fingerprint and
+   * did nothing with it.
    *
-   * So the composer may compute a fingerprint and must not apply recency.
+   * Novelty is now activated (§6z). What has NOT changed is that the policy
+   * numbers remain defaults rather than decisions — so the tests move from
+   * "recency must not be applied" to "recency must not be able to override
+   * evidence", which is the invariant that actually protects anybody.
    */
-  it('the composer does not apply recency', () => {
-    expect(COMPOSER).not.toContain('applyRecency');
-    expect(COMPOSER).not.toContain('DEFAULT_NOVELTY');
+  it('the composer applies recency to its scores', () => {
+    expect(SHARED_COMPOSE).toContain('applyRecency');
+  });
+
+  it('it reads a bounded window of recent history', () => {
+    // Unbounded history would be a growing query on every composition, and a
+    // penalty that decays to nothing has no use for the sixth session back.
+    expect(COMPOSER).toContain('DEFAULT_NOVELTY.lookbackSessions');
+    expect(COMPOSER).toContain('.limit(');
+  });
+
+  it('effectiveness is computed first and recency layered on top', () => {
+    expect(SHARED_COMPOSE).toContain('applyRecency(scoresFrom(');
+  });
+
+  it('the policy numbers are still labelled as undecided', () => {
+    const novelty = read('supabase', 'functions', '_shared', 'novelty.ts');
+    expect(novelty).toContain('PRODUCT DECISION THAT HAS NOT BEEN MADE');
+  });
+
+  it('recency cannot bury a module that works for somebody', () => {
+    // Rule 8. Enforced in novelty-replay.test.ts against real arithmetic; here
+    // what matters is that the bound exists at all.
+    const novelty = read('supabase', 'functions', '_shared', 'novelty.ts');
+    expect(novelty).toContain('MOST RECENT OCCURRENCE ONLY');
+    expect(novelty).toContain('penaltyFloor');
+  });
+
+  it('isRecentlySeen is still not wired', () => {
+    // Retrying an identical composition is a different mechanism and was not
+    // part of activating recency weighting.
     expect(COMPOSER).not.toContain('isRecentlySeen');
-  });
-
-  it('the composer does not read a person’s recent fingerprints', () => {
-    // Reading history back is the activation step, and it is not taken here.
-    expect(COMPOSER).not.toMatch(/select\([^)]*fingerprint/);
-  });
-
-  it('no novelty policy constant is used in the composer', () => {
-    expect(COMPOSER).not.toContain('lookbackSessions');
-    expect(COMPOSER).not.toContain('maxPenalty');
   });
 });
 

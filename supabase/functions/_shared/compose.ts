@@ -1,4 +1,5 @@
 import { planPhases, scoresFrom } from './allocate.ts';
+import { applyRecency } from './novelty.ts';
 import { checkBudget } from './speech.ts';
 import type {
   CompositionFailure,
@@ -41,6 +42,20 @@ export type CompositionInput = {
   bed?: InterventionModule | null;
   /** This person's history. Absent for anyone signed out — and that is fine. */
   effectiveness?: readonly ModuleEffectiveness[];
+  /**
+   * The module ids heard in each of this person's recent sessions, most recent
+   * first. Absent for anyone signed out, and for a first session.
+   *
+   * FRESH BY DEFAULT, REPEAT ON PURPOSE. Without this the engine is entirely
+   * deterministic: the same recipe at the same duration returns the same
+   * manifest for ever, however large the library grows. That was measured over
+   * 600 simulated sessions and produced exactly one manifest per case.
+   *
+   * The penalty is bounded and floored by `applyRecency`, so novelty reorders
+   * modules that are otherwise equal and never buries one that works for
+   * somebody. Rule 8 outranks variety.
+   */
+  recent?: readonly (readonly string[])[];
   /** Dynamic speech, already built from structured state. */
   speech?: readonly SpeechRequest[];
 };
@@ -95,7 +110,10 @@ export function compose(input: CompositionInput): CompositionResult {
   const plan = planPhases(
     phases,
     (phase) => input.modulesByPhase[phase] ?? [],
-    scoresFrom(input.effectiveness ?? []),
+    // Effectiveness first, then recency on top of it. The order matters: a
+    // module that works for this person starts high and a recency penalty only
+    // nudges it, where the reverse would let freshness decide outright.
+    applyRecency(scoresFrom(input.effectiveness ?? []), input.recent ?? []),
     available,
     offset
   );

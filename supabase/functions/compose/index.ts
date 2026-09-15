@@ -36,9 +36,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { compose } from "../_shared/compose.ts";
 // Recording WHAT was composed, so that a freshness policy has a history to read
 // when one is decided. This applies no policy: nothing here deprioritises a
-// module, and no recency weighting is active. See the migration
-// `20260909180000_persist_fingerprint.sql`.
-import { manifestFingerprint } from "../_shared/novelty.ts";
+// module. Recency weighting IS active — see `_shared/novelty.ts` and the
+// history block below. The migration `20260909180000_persist_fingerprint.sql`
+// records why the fingerprint is stored.
+import { DEFAULT_NOVELTY, manifestFingerprint } from "../_shared/novelty.ts";
 import { BUDGET_NORMAL_SECONDS } from "../_shared/speech.ts";
 import type {
   InterventionModule,
@@ -433,6 +434,7 @@ Deno.serve(async (req: Request) => {
 
   // ---- This person's history ---------------------------------------------
   let effectiveness: { moduleId: string; positive: number; total: number }[] = [];
+  let recent: string[][] = [];
   if (userId) {
     const { data } = await admin
       .from("module_effectiveness")
@@ -445,6 +447,27 @@ Deno.serve(async (req: Request) => {
       positive: r.positive,
       total: r.total,
     }));
+
+    // WHAT THEY HAVE JUST HEARD, most recent first.
+    //
+    // Read from persisted manifests rather than from outcomes: a session counts
+    // as heard whether or not the person rated it, and rating is optional. Only
+    // the lookback window is fetched, because a penalty that decays to nothing
+    // across five sessions has no use for the sixth.
+    const { data: recentManifests } = await admin
+      .from("session_manifests")
+      .select("id, created_at, manifest_segments(module_id)")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(DEFAULT_NOVELTY.lookbackSessions);
+
+    recent = ((recentManifests ?? []) as {
+      manifest_segments: { module_id: string | null }[];
+    }[]).map((m) =>
+      (m.manifest_segments ?? [])
+        .map((s) => s.module_id)
+        .filter((id): id is string => id !== null)
+    );
   }
 
   // ---- Compose ------------------------------------------------------------
@@ -480,6 +503,7 @@ Deno.serve(async (req: Request) => {
     modulesByPhase,
     bed: library.find((m) => m.isBed) ?? null,
     effectiveness,
+    recent,
     speech: [],
   });
 
@@ -516,8 +540,10 @@ Deno.serve(async (req: Request) => {
   if (signed.size !== paths.length) return fail("audio_unavailable");
 
   // The composition's identity, built from the module versions actually used.
-  // Recorded, not acted upon: no recency penalty is applied anywhere in this
-  // function, and none will be until the lookback and weighting are decided.
+  //
+  // Recorded AND acted upon: the recency penalty above is derived from the
+  // manifests these fingerprints belong to. The policy numbers themselves
+  // (`DEFAULT_NOVELTY`) remain defaults rather than product decisions.
   const versions = new Map(playable.map((row) => [row.id, row.version]));
   const fingerprint = manifestFingerprint(manifest, versions);
 

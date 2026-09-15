@@ -117,10 +117,26 @@ describe('recency shapes ranking without banning anything', () => {
   it('cannot outweigh a real effectiveness difference', () => {
     // The penalty is bounded below the gap between a proven and an unrated
     // module, so novelty reorders equals rather than overriding evidence.
-    const scores = new Map([['proven', 1.0], ['unrated', 0.5]]);
-    const adjusted = applyRecency(scores, [['proven'], ['proven'], ['proven']]);
+    //
+    // THIS TEST USED TO PASS FOR THE WRONG REASON. It used three sessions and a
+    // perfect 1.0, which stayed above 0.5 even while the penalty accumulated
+    // once per session. At five sessions and a realistic 0.9 the same code
+    // produced 0.45 and buried the module. The window is now filled and the
+    // score is one a real module could earn.
+    const scores = new Map([['proven', 0.9], ['unrated', 0.5]]);
+    const full = Array.from({ length: DEFAULT_NOVELTY.lookbackSessions }, () => ['proven']);
+    const adjusted = applyRecency(scores, full);
 
     expect(adjusted.get('proven')!).toBeGreaterThan(adjusted.get('unrated') ?? 0.5);
+  });
+
+  it('the penalty never exceeds maxPenalty, however many times it was heard', () => {
+    // Only the most recent occurrence counts. Accumulating over the window is
+    // what buried a well-rated module.
+    const scores = new Map([['a', 0.9]]);
+    const full = Array.from({ length: DEFAULT_NOVELTY.lookbackSessions }, () => ['a']);
+    expect(0.9 - applyRecency(scores, full).get('a')!)
+      .toBeLessThanOrEqual(DEFAULT_NOVELTY.maxPenalty + 1e-9);
   });
 
   it('only looks back as far as the policy says', () => {
