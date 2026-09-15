@@ -48,14 +48,14 @@ Last updated: 2026-09-09.
 | Lint | clean |
 | Migrations | 18 written, **all applied** |
 | Edge functions | all four deployed and current — marker `d14eaf4f` |
-| Modules | **18 playable**; +10 reaches 60/60 (§7a) |
+| Modules | **18 playable**; +10 drafted reaches 51/60 (§7b) |
 | Audio | **54 renditions, all approved** — 18 modules x warm, clear, bright, at 0.92x |
 | Recipes | **30 of 60** recipe/duration/voice combinations compose |
 | Voices | `warm` (default), `clear`, `bright` all selectable. 7 more catalogued, unmapped |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content** |
 | Commercial | entitlement schema live; **RevenueCat absent, no purchase possible** |
 | Novelty | **active** (§6z) — recency applied, policy numbers still defaults |
-| Blocking | 10 modules (§7a); **nothing heard on a device** |
+| Blocking | content pack awaiting review (§7b); **nothing heard on a device** |
 
 **As of 2026-09-14 the product composes a real session.** Free text enters the
 safety gate, `nervous_ready` composes at all four durations from six approved
@@ -590,12 +590,12 @@ else. It fails silently — nothing errors, it is simply never selected.
   consequence: 7 distinct sessions in 30 simulated repeats, one module in every
   single one. Recorded as a content decision with the three supported options
   and no recommendation, because no approved freshness threshold exists.
-- **`flat_go`** has the only single-family phase in the product (`wake_body`,
-  `activate` only), and `activate` is eligible in three phases. That
-  combination already broke composition at 300s once; the fix was a second
-  short variant in `activate` and `prepare`, and both are marked load-bearing.
-- **`scattered_focused`** can consume three distinct `focus` modules in one
-  session, and holds the largest slot anywhere at 402s.
+  - **`flat_go`** has the only single-family phase in the product (`wake_body`,
+    `activate` only), and `activate` is eligible in three phases. That
+    combination already broke composition at 300s once; the fix was a second
+    short variant in `activate` and `prepare`, and both are marked load-bearing.
+  - **`scattered_focused`** can consume three distinct `focus` modules in one
+    session, and holds the largest slot anywhere at 402s.
 
 ## 6d. The import pipeline, exercised
 
@@ -641,10 +641,10 @@ Serious, and only findable by installing ffmpeg. Two bugs stacked:
 1. `loudness()` read ffmpeg's stderr only inside a `catch`, but
    `ffmpeg -f null -` **succeeds** — so the success path returned null
    unconditionally and the catch never ran.
-2. After fixing that it still failed: the parser sliced from the opening brace
-   to the end of stderr, and ffmpeg writes progress lines after the JSON
-   summary, so `JSON.parse` threw — swallowed by the same catch and surfaced as
-   "could not be measured", indistinguishable from ffmpeg being absent.
+   2. After fixing that it still failed: the parser sliced from the opening brace
+      to the end of stderr, and ffmpeg writes progress lines after the JSON
+      summary, so `JSON.parse` threw — swallowed by the same catch and surfaced as
+      "could not be measured", indistinguishable from ffmpeg being absent.
 
 **Consequence: the −16 LUFS and −1 dBTP limits had never been enforced on
 anything and could not have been.** Every other audio check was working.
@@ -1225,9 +1225,9 @@ outstanding.
 - **Script integrity, by SHA-256.** All five `script_text` values matched the
   approved production pack exactly, at 190 / 248 / 335 / 381 / 99 characters.
   Programmatic, because a transcription slip in approved content is silent.
-- **Records-only validation** — exit 0, with audio checks not run and not
-  claimed.
-- **Dry run** — 5 module rows, 5 `en` version rows, **0 renditions**, 0 approved.
+  - **Records-only validation** — exit 0, with audio checks not run and not
+    claimed.
+  - **Dry run** — 5 module rows, 5 `en` version rows, **0 renditions**, 0 approved.
 
 ### What is known from outside the boundary
 
@@ -1480,10 +1480,10 @@ itself introduced.
    *near* a target rather than on it. That is a transcode, not a master, and it
    is why the loudness came out at -17.0 against a -16 target.
 
-2. **Aiming at the ceiling.** loudnorm's true-peak limiting acts on PCM. AAC then
-   reconstructs a slightly different waveform and can add inter-sample peaks a
-   few tenths of a decibel above what went in. Aiming at exactly -1 dBTP
-   therefore lands just *over* -1, reliably. That is the -0.9.
+   2. **Aiming at the ceiling.** loudnorm's true-peak limiting acts on PCM. AAC then
+      reconstructs a slightly different waveform and can add inter-sample peaks a
+      few tenths of a decibel above what went in. Aiming at exactly -1 dBTP
+      therefore lands just *over* -1, reliably. That is the -0.9.
 
 Between them, the provider was being asked to hit a mastering target by luck.
 The gate was correct throughout; what fed it was not.
@@ -1494,13 +1494,13 @@ The chain moved into `scripts/lib/mastering.mjs`, which `finalise-master.mjs`
 now imports, and became a real two-pass master:
 
 - **Pass one** measures the trimmed source.
-- **Pass two** applies those measurements with `linear=true` — a single gain
-  offset across the whole file, so speech dynamics survive rather than being
-  compressed. Where a take's crest factor is too high for one uniform gain to
-  satisfy both targets, loudnorm falls back to limiting the transients. That is
-  what mastering is *for*, and it is not a reason to reject a take.
-- **The aim moved to -1.5 dBTP**, leaving the encoder half a decibel of headroom
-  so the *encoded* file lands under the ceiling.
+  - **Pass two** applies those measurements with `linear=true` — a single gain
+    offset across the whole file, so speech dynamics survive rather than being
+    compressed. Where a take's crest factor is too high for one uniform gain to
+    satisfy both targets, loudnorm falls back to limiting the transients. That is
+    what mastering is *for*, and it is not a reason to reject a take.
+  - **The aim moved to -1.5 dBTP**, leaving the encoder half a decibel of headroom
+    so the *encoded* file lands under the ceiling.
 
 `SPEC.truePeak` is still `-1` and is still what the gate checks. `truePeak` and
 `masterTruePeak` are now separate named values so the distinction between *what
@@ -1533,13 +1533,13 @@ three are the same shape:
 
 - The fixture's transient sat at `t=0`, where the chain's own silence trim
   clipped it. The assertion was measuring something other than what it named.
-- One ordering assertion anchored on `storage/v1/object`, which also matches the
-  **download** of the staged render — necessarily earlier than the gates, so the
-  assertion proved nothing. Re-anchored on the upload's own `x-upsert` header.
-- **The fixture was flaky.** `anoisesrc` is unseeded, so the peak moved run to
-  run: -0.2 dBTP on one run, -1.7 on the next. The guard would have passed
-  locally and failed at random later, which is worse than no guard. Seeded at
-  `1729`, recalibrated, and confirmed identical across three consecutive runs.
+  - One ordering assertion anchored on `storage/v1/object`, which also matches the
+    **download** of the staged render — necessarily earlier than the gates, so the
+    assertion proved nothing. Re-anchored on the upload's own `x-upsert` header.
+  - **The fixture was flaky.** `anoisesrc` is unseeded, so the peak moved run to
+    run: -0.2 dBTP on one run, -1.7 on the next. The guard would have passed
+    locally and failed at random later, which is worse than no guard. Seeded at
+    `1729`, recalibrated, and confirmed identical across three consecutive runs.
 
 One pre-existing assertion in `master-generation.test.ts` was grepping
 `finalise-master.mjs` for gate strings that had moved into the library. Updated
@@ -1549,11 +1549,11 @@ to follow the code — same assertions, right file.
 
 - **No ElevenLabs call.** The mastering library has no network access at all, and
   a test asserts that.
-- **The Clear staged MP3 is preserved** and untouched. A mastering defect is
-  fixed by mastering again, not by paying for the take twice.
-- **Nothing was uploaded, approved or written to the database.** No Supabase
-  access of any kind.
-- **Bright was not finalised.**
+  - **The Clear staged MP3 is preserved** and untouched. A mastering defect is
+    fixed by mastering again, not by paying for the take twice.
+  - **Nothing was uploaded, approved or written to the database.** No Supabase
+    access of any kind.
+  - **Bright was not finalised.**
 
 ### The fix above was incomplete. A second defect was underneath it.
 
@@ -1902,10 +1902,10 @@ are untouched by construction.
 
 - **No time-stretching.** `atempo`, `rubberband` and `asetrate` appear nowhere,
   and a test asserts it. Faking pace in post was not approved.
-- **No change to wording, punctuation, structure, recipes, the audio production
-  specification, loudness, mastering, duration ceilings or voice identities.**
-- **No default change.** The three approved voices keep their current delivery
-  until the product owner approves the slower one.
+  - **No change to wording, punctuation, structure, recipes, the audio production
+    specification, loudness, mastering, duration ceilings or voice identities.**
+  - **No default change.** The three approved voices keep their current delivery
+    until the product owner approves the slower one.
 
 ### To run the test
 
@@ -1952,9 +1952,9 @@ Two tables and two `security definer` RPCs now hold it, in migration
   would recognise: `active`, `grace`, `billing_issue`, `cancelled`, `expired`.
   Grace, billing issue and cancellation all **retain** access — somebody who
   cancels on day two of an annual subscription has paid for the year.
-- **`free_session_ledger`** — append-only, `run_id` unique, keyed to
-  `auth.users`. A reinstall does not reset it and a repeated report is a no-op
-  rather than a second charge.
+  - **`free_session_ledger`** — append-only, `run_id` unique, keyed to
+    `auth.users`. A reinstall does not reset it and a repeated report is a no-op
+    rather than a second charge.
 
 Read your own; write neither. Both tables are service-role write only, because a
 client that could insert into either could grant itself the product.
@@ -2391,7 +2391,7 @@ Version rows are untouched: `intervention_module_versions.duration_seconds` is
 part of a version's identity and the append-only trigger refuses to change it.
 A version records what was approved, not what was later measured.
 
-## 6x. Seven modules that bought nothing, and a model that drifted
+## 6x. Seven modules that bought nothing, and a model that drifted (historical)
 
 2026-09-15. The `transition` family was authored, generated and approved in three
 voices — 7 modules, 21 renditions, 21/21 mastered first pass. Composition did not
@@ -2445,10 +2445,10 @@ sixty generations as they stand.
 1. **Validate against live `compose` calls**, not a frozen table. The tool that
    answers "is the library finished" must re-derive its own ground truth every
    run, or it decays into a confident guess.
-2. **Give hypothetical modules a realistic duration spread**, drawn from the
-   distribution of real ones rather than a single value per family.
-3. **Report an order, not just a target** — either state that the configuration
-   is joint, or compute a sequence where each step gains something measurable.
+   2. **Give hypothetical modules a realistic duration spread**, drawn from the
+      distribution of real ones rather than a single value per family.
+   3. **Report an order, not just a target** — either state that the configuration
+      is joint, or compute a sequence where each step gains something measurable.
 
 ### State
 
@@ -2466,7 +2466,7 @@ The seven transition modules are sound work — approved, mastered first pass,
 durations synced. They are needed in the end state. They simply do not move
 anything on their own, and that should have been said before they were made.
 
-## 6y. The planning tool, rebuilt — and the real roadmap to 60/60
+## 6y. The planning tool, rebuilt (HISTORICAL — numbers superseded by §7b)
 
 2026-09-15. `library-sizing.mjs` is deleted. `scripts/plan-library.mjs`
 (`npm run plan`) replaces it.
@@ -2491,17 +2491,21 @@ checking facts rather than reality.
 - **Live baseline every run.** It calls `compose` for all 20 recipe/duration
   cases and uses that as truth. Without service-role access it **refuses to
   plan** rather than fall back to a fixture.
-- **Refuses to recommend on disagreement.** The simulator must reproduce the live
-  baseline exactly; on any mismatch it exits without a recommendation.
-- **Exact per-module durations.** This alone closed the 30-versus-27 gap: the
-  simulator now agrees with the composer on all 20 cases.
-- **Duration shapes derived from recipe floors**, not one number per family, and
-  reported as "`settle` module, 60s or shorter" rather than "`settle` +1".
-- **Smallest gaining batch, breadth-first.** Size 1 is exhausted before size 2 is
-  tried, so a reported batch really is the smallest. Multi-module batches are
-  labelled `DEPENDENT BATCH — these only work together`.
+  - **Refuses to recommend on disagreement.** The simulator must reproduce the live
+    baseline exactly; on any mismatch it exits without a recommendation.
+  - **Exact per-module durations.** This alone closed the 30-versus-27 gap: the
+    simulator now agrees with the composer on all 20 cases.
+  - **Duration shapes derived from recipe floors**, not one number per family, and
+    reported as "`settle` module, 60s or shorter" rather than "`settle` +1".
+  - **Smallest gaining batch, breadth-first.** Size 1 is exhausted before size 2 is
+    tried, so a reported batch really is the smallest. Multi-module batches are
+    labelled `DEPENDENT BATCH — these only work together`.
 
 ### The roadmap: 27/60 to 60/60 in twelve modules
+
+**SUPERSEDED.** This roadmap was computed before candidates were capped at the
+mastering ceiling, and several of its steps could not have been built. The
+current path is in §7b. Kept for the reasoning, not the numbers.
 
 Every step gains, except the last two which are dependent pairs.
 
@@ -2582,10 +2586,10 @@ Selection is deterministic with neutral scores.
 
 - `CompositionInput` gains `recent` — module ids per recent session, most recent
   first. The engine stays pure and testable without a database.
-- Scores are `applyRecency(scoresFrom(effectiveness), recent)`. **Effectiveness
-  first, recency on top**; the reverse would let freshness decide outright.
-- The Edge Function reads the last `lookbackSessions` manifests with their
-  segment module ids.
+  - Scores are `applyRecency(scoresFrom(effectiveness), recent)`. **Effectiveness
+    first, recency on top**; the reverse would let freshness decide outright.
+  - The Edge Function reads the last `lookbackSessions` manifests with their
+    segment module ids.
 
 **History comes from manifests, not outcomes.** A session counts as heard whether
 or not it was rated, and rating is optional — keying novelty to outcomes would
@@ -2639,7 +2643,7 @@ go, novelty is what makes the depth felt.
 `isRecentlySeen` remains uncalled. Retrying an identical composition is a
 different mechanism and was left for a later pass.
 
-## 7a. The first prediction that held — and two roadmap defects it caught
+## 7a. The first prediction that held — and two roadmap defects it caught (historical)
 
 2026-09-15. `settle_nothing_to_decide_short` authored, approved, generated in
 three voices, 3/3 mastered first pass. **27/60 to 30/60, exactly as forecast.**
@@ -2694,6 +2698,63 @@ remaining    10 modules to 60/60 (ground, prepare, focus)
 `nervous_ready` and `wired_sleep` at every duration; `scattered_focused` and
 `wound_up_home` at 300s; `flat_go` at none.
 
+## 7b. The English functional pack — and why it stops at 51/60
+
+2026-09-15. Ten drafts written, none approved, no audio generated, no provider
+call made. `docs/english-functional-completion-pack.md` holds them for a single
+review pass.
+
+### The live roadmap disagreed with the previous estimate
+
+`npm run plan` against the live 30/60 baseline reaches **51/60 with ten modules**
+— five `prepare`, five `focus` — and then reports that no batch of four or fewer
+improves it further. The earlier "ten modules to 60/60" figure came from the run
+before candidates were capped at the mastering ceiling and was wrong.
+
+### What stops at 51/60, and why more content is a poor answer
+
+`wound_up_home` at 600s, 900s and 1200s stays broken. It is not a missing family.
+
+At 1200s the `settle` phase is starved because `reconnect_to_now` runs
+immediately before it, is allocated 346 seconds, and accepts the same families —
+`ground`, `transition`, `settle`. It chains through the shared pool and leaves
+nothing.
+
+```
+arrive              alloc  58s   took 1
+downshift_arousal   alloc 290s   took 1
+leave_work_behind   alloc 231s   took 8
+reconnect_to_now    alloc 346s   took 3
+settle              alloc 231s   took 0   <- starved
+close               alloc  44s   took 1
+```
+
+Measured: **fifteen** further `ground` or `settle` modules clear it. Eight do
+not. Those fifteen would exist for no purpose except to out-supply a greedy
+phase — 45 provider generations of content whose job is to survive being eaten.
+
+The allocator is deliberately greedy and legible and has NOT been changed. But
+the choice should be made deliberately:
+
+- author fifteen more modules (45 generations, real depth for novelty);
+- give the allocator lookahead or a reservation rule (a code change, no further
+  content);
+- accept 51/60 and offer `wound_up_home` at 300s only.
+
+### Drafting notes
+
+Estimated durations matter more than expected. The first draft of the `prepare`
+modules came in around 23s against the planner's 29s shape and predicted 48/60,
+not 51 — shorter modules chain differently, and `flat_go@1200s` fell out. Written
+to the modelled length, the prediction matches.
+
+All ten pass the house rules: no physical instruction (checked mechanically),
+highest overlap against the existing eighteen is 11% against an 18% threshold, no
+repeated openings or closings anywhere in the library.
+
+**Everything past 30/60 in this section is PREDICTED UNTIL IMPORTED AND
+MASTERED.**
+
 ## 7. Known gaps
 
 Stated plainly so none is mistaken for finished work.
@@ -2702,58 +2763,58 @@ Stated plainly so none is mistaken for finished work.
   and `wired_sleep` work at every duration; `scattered_focused` only at 300s;
   `flat_go` and `wound_up_home` at none. Depth is needed in `ground`, `prepare`,
   `reframe` and `settle` — all still singletons.
-- ~~The sizing model is not trustworthy~~ — **fixed** (§6y). `npm run plan`
-  validates against the live composer every run and refuses to plan without it.
-- ~~Novelty is recorded but not applied~~ — **activated** (§6z), and it exposed a
-  defect that would have buried well-rated modules. Policy numbers remain
-  defaults rather than product decisions.
-- **`isRecentlySeen` is still uncalled.** Retrying an identical composition is a
-  separate mechanism from recency weighting and was left for a later pass.
-- **No session has ever been heard.** Composition and persistence are proven;
-  device playback, outcome capture, novelty and replay are not.
-- **Manifest persistence is atomic but still unexercised.** It now writes
-  through a `security definer` RPC so a manifest and its segments land
-  together or not at all. The rows are checked against the real schema
-  constraints and the rollback path is pinned, but **no INSERT has ever
-  run** — that needs an approved module with real audio, and inventing one
-  is precisely what must not happen. Watch it the first time content lands.
-- **Nothing writes `session_costs`.** The manifest link and every column exist;
-  the row does not, because there is no generation to cost. Needs a TTS
-  provider.
-- **ElevenLabs has now been called live, for production masters only.** Warm
-  and Clear renders of `nr_arrive_short` were generated through
-  `generate-master` (§6q). This is offline, build-time voice production; it is
-  **not** session TTS. No dynamic speech is generated during a session, nothing
-  writes `generated_segments`, and sessions still bill nothing. See §6h.
-- **Edge Function typechecking is real but partial.** `npm run
-  typecheck:functions` checks the functions' own logic — imports resolve, names
-  exist, types line up — using hand-written ambient stubs in
-  `supabase/functions/deno-ambient.d.ts`. It does NOT verify calls against the
-  real supabase-js signatures, because there is no `deno` here and tsc cannot
-  resolve a `jsr:` specifier. Do not read a clean run as full Deno type safety.
-- **Novelty records but does not act.** The composer now computes a manifest
-  fingerprint and persists it, so a freshness policy will have a history to
-  read when one is decided. It applies **no** recency: it imports no policy
-  constant, reads no prior fingerprints, and deprioritises nothing, and
-  `schema-reachability.test.ts` asserts each of those. Activating it is
-  blocked on two product decisions — the recency window, and how novelty
-  weighs against measured effectiveness.
-- **`_shared/replay.ts` is unreachable from the product.** Exact replay and
-  reuse-intent are written and tested, but nothing saves a session, so there
-  is nothing to replay. `saved_sessions` has no writer for the same reason.
-  Whether the saved/replay journey is in V1 is a scope decision that has not
-  been made, and a writer was not invented for it.
-- **`wired_sleep` has a content variety problem, not a code problem.** Over 30
-  simulated repeat sessions it produced 7 distinct compositions, and
-  `sleep_10s` appeared in **all 30**, because it is the only module short
-  enough for that recipe's 11-second `close`. No novelty weighting can vary a
-  slot with one candidate. Flagged as **CONTENT INVENTORY EXPANSION DECISION
-  REQUIRED**; modules were deliberately not invented to improve the number.
-  For comparison: `nervous_ready` produced 30 distinct compositions from 30.
-- **Edge fades, not crossfades.** A true crossfade overlaps cues and would make
-  playback finish before the composed duration. Deferred to the design pass.
-- **`FADE_SECONDS`, `BED_GAIN`, `BED_GAIN_DUCKED` are engineering defaults**,
-  not approved production values.
+  - ~~The sizing model is not trustworthy~~ — **fixed** (§6y). `npm run plan`
+    validates against the live composer every run and refuses to plan without it.
+  - ~~Novelty is recorded but not applied~~ — **activated** (§6z), and it exposed a
+    defect that would have buried well-rated modules. Policy numbers remain
+    defaults rather than product decisions.
+  - **`isRecentlySeen` is still uncalled.** Retrying an identical composition is a
+    separate mechanism from recency weighting and was left for a later pass.
+  - **No session has ever been heard.** Composition and persistence are proven;
+    device playback, outcome capture, novelty and replay are not.
+  - **Manifest persistence is atomic but still unexercised.** It now writes
+    through a `security definer` RPC so a manifest and its segments land
+    together or not at all. The rows are checked against the real schema
+    constraints and the rollback path is pinned, but **no INSERT has ever
+    run** — that needs an approved module with real audio, and inventing one
+    is precisely what must not happen. Watch it the first time content lands.
+  - **Nothing writes `session_costs`.** The manifest link and every column exist;
+    the row does not, because there is no generation to cost. Needs a TTS
+    provider.
+  - **ElevenLabs has now been called live, for production masters only.** Warm
+    and Clear renders of `nr_arrive_short` were generated through
+    `generate-master` (§6q). This is offline, build-time voice production; it is
+    **not** session TTS. No dynamic speech is generated during a session, nothing
+    writes `generated_segments`, and sessions still bill nothing. See §6h.
+  - **Edge Function typechecking is real but partial.** `npm run
+    typecheck:functions` checks the functions' own logic — imports resolve, names
+    exist, types line up — using hand-written ambient stubs in
+    `supabase/functions/deno-ambient.d.ts`. It does NOT verify calls against the
+    real supabase-js signatures, because there is no `deno` here and tsc cannot
+    resolve a `jsr:` specifier. Do not read a clean run as full Deno type safety.
+  - **Novelty records but does not act.** The composer now computes a manifest
+    fingerprint and persists it, so a freshness policy will have a history to
+    read when one is decided. It applies **no** recency: it imports no policy
+    constant, reads no prior fingerprints, and deprioritises nothing, and
+    `schema-reachability.test.ts` asserts each of those. Activating it is
+    blocked on two product decisions — the recency window, and how novelty
+    weighs against measured effectiveness.
+  - **`_shared/replay.ts` is unreachable from the product.** Exact replay and
+    reuse-intent are written and tested, but nothing saves a session, so there
+    is nothing to replay. `saved_sessions` has no writer for the same reason.
+    Whether the saved/replay journey is in V1 is a scope decision that has not
+    been made, and a writer was not invented for it.
+  - **`wired_sleep` has a content variety problem, not a code problem.** Over 30
+    simulated repeat sessions it produced 7 distinct compositions, and
+    `sleep_10s` appeared in **all 30**, because it is the only module short
+    enough for that recipe's 11-second `close`. No novelty weighting can vary a
+    slot with one candidate. Flagged as **CONTENT INVENTORY EXPANSION DECISION
+    REQUIRED**; modules were deliberately not invented to improve the number.
+    For comparison: `nervous_ready` produced 30 distinct compositions from 30.
+  - **Edge fades, not crossfades.** A true crossfade overlaps cues and would make
+    playback finish before the composed duration. Deferred to the design pass.
+  - **`FADE_SECONDS`, `BED_GAIN`, `BED_GAIN_DUCKED` are engineering defaults**,
+    not approved production values.
 
 ## 8. What is needed next, and from whom
 
@@ -2765,25 +2826,25 @@ Engineering has taken this as far as it legitimately can without content.
    are what makes a real session exist at all; see §8c. The full 47 are in
    [`module-inventory-v1.md`](./module-inventory-v1.md), and each needs
    technique, wording, delivery and a `technique_key`.
-2. `intensity` semantics — the column is 1–10 and read by nothing; what a 3
-   means versus an 8 is undefined.
-3. ~~Audio format~~ — **resolved.** Specified in
-   [`audio-production-spec.md`](./audio-production-spec.md) and enforced by
-   the validator: AAC-LC in `.m4a`, 44.1kHz mono, 96kbps, −16 LUFS ±1,
-   −1 dBTP, ≤100ms head and tail silence, no baked-in fades.
-4. Whether 20–30% silence in a five-minute session is acceptable. If not, the
-   answer is more short modules.
-5. Whether `wired_sleep` gets more short `close` modules, or whether one
-   repeated closing module is acceptable there.
+   2. `intensity` semantics — the column is 1–10 and read by nothing; what a 3
+      means versus an 8 is undefined.
+   3. ~~Audio format~~ — **resolved.** Specified in
+      [`audio-production-spec.md`](./audio-production-spec.md) and enforced by
+      the validator: AAC-LC in `.m4a`, 44.1kHz mono, 96kbps, −16 LUFS ±1,
+      −1 dBTP, ≤100ms head and tail silence, no baked-in fades.
+   4. Whether 20–30% silence in a five-minute session is acceptable. If not, the
+      answer is more short modules.
+   5. Whether `wired_sleep` gets more short `close` modules, or whether one
+      repeated closing module is acceptable there.
 
 **From product — blocking the novelty wiring:**
 
 1. How many sessions, or how long, counts as "recent".
-2. How novelty should weigh against measured effectiveness. The current
-   defaults are placeholders chosen so the mechanism could be simulated; they
-   are not findings, and `novelty-simulation.test.ts` exists so the call can be
-   made from evidence.
-3. Whether the freshness in §7 is acceptable for someone using this daily.
+   2. How novelty should weigh against measured effectiveness. The current
+      defaults are placeholders chosen so the mechanism could be simulated; they
+      are not findings, and `novelty-simulation.test.ts` exists so the call can be
+      made from evidence.
+   3. Whether the freshness in §7 is acceptable for someone using this daily.
 
 **From design:** the screen pass. The two questions from the device walk were
 examined during the functional completion pass and **neither is a defect**:
@@ -2793,9 +2854,9 @@ examined during the functional completion pass and **neither is a defect**:
   the person picks instead. The journey completes; `/time` guards on the
   interpretation, not on the safety flag, so there is no dead end. Whether
   that screen should be *presented* as a correction is a design question.
-- Someone arriving `tired_wired` sees one enabled target because the approved
-  transition map contains exactly one route from that state. Showing five
-  dimmed cards is a presentation choice, not a functional fault.
+  - Someone arriving `tired_wired` sees one enabled target because the approved
+    transition map contains exactly one route from that state. Showing five
+    dimmed cards is a presentation choice, not a functional fault.
 
 **From engineering, once content exists:** validate and import the manifest,
 upload masters to the private bucket, set `approved`, watch manifest
@@ -2808,10 +2869,10 @@ provider is chosen.
 - **`ffmpeg` and `ffprobe` on the importing machine.** Installed here on
   2026-09-09 (Gyan 9.0.1, via winget), but on the user PATH — a shell must be
   restarted to see it. Without them the importer refuses to commit.
-- **A service-role key**, supplied in the environment for that one command
-  and never added to `.env`. Not available on this machine, which is why
-  upload, insert, version rows, composer selection and persistence are still
-  unexercised.
+  - **A service-role key**, supplied in the environment for that one command
+    and never added to `.env`. Not available on this machine, which is why
+    upload, insert, version rows, composer selection and persistence are still
+    unexercised.
 
 ## 8b. Functional completion status
 
@@ -2886,12 +2947,12 @@ identically, for the same missing families.
 
 1. **`ground`** — four blocked phases across three recipes. The highest-leverage
    single module in the library.
-2. **`settle`** — three blocked phases across two recipes.
-3. **`focus`** — unblocks `nervous_ready` outright: one module, one working
-   recipe, and the first genuinely playable session.
-4. **`activate`** — `flat_go` needs **two**, because both its blocked phases
-   accept nothing else.
-5. **`release`**, **`sleep`**, **`transition`** — one phase each.
+   2. **`settle`** — three blocked phases across two recipes.
+   3. **`focus`** — unblocks `nervous_ready` outright: one module, one working
+      recipe, and the first genuinely playable session.
+   4. **`activate`** — `flat_go` needs **two**, because both its blocked phases
+      accept nothing else.
+   5. **`release`**, **`sleep`**, **`transition`** — one phase each.
 
 **Roughly 8–10 more modules makes all five recipes composable**, not the 42 that
 "47 minus 5" implies. The remaining 30-odd are depth, novelty and variation —
@@ -2901,19 +2962,25 @@ a session can exist at all.
 ### What is already done
 
 - Wording authored, reviewed and content-approved for all five (§6f, §6n).
-- Audio produced in **warm, clear and bright** at 0.92x pace, mastered to
-  specification, and human-approved — 15 renditions (§6r, §6t).
-- All five modules `approved = true`; three voices selectable.
-- Safety gate and interpretation proven live: free text in, `nervous_ready` /
-  600s / `pre_meeting` out, raw text never leaving the server.
+  - Audio produced in **warm, clear and bright** at 0.92x pace, mastered to
+    specification, and human-approved — 15 renditions (§6r, §6t).
+  - All five modules `approved = true`; three voices selectable.
+  - Safety gate and interpretation proven live: free text in, `nervous_ready` /
+    600s / `pre_meeting` out, raw text never leaving the server.
 
 ### The single next action
 
-**See §6y.** The next batch is one `settle` module, and the roadmap to 60/60 runs
-to twelve modules across four families.
+**PRODUCT-OWNER REVIEW OF THE REMAINING ENGLISH FUNCTIONAL CONTENT PACK.**
 
-This section's earlier advice — "author one `focus` module" — is superseded and
-was correct only while the library had five modules and no audio.
+`docs/english-functional-completion-pack.md` — ten drafts, one review pass. On
+approval: import, then 30 ElevenLabs calls across three voices, taking live
+coverage from 30/60 to a predicted 51/60.
+
+Then a decision on `wound_up_home` at long durations (§7b): fifteen more modules,
+an allocator change, or accept 51/60.
+
+Earlier advice in this section — "author one `focus` module", then "one `settle`
+module" — is superseded. Both exist.
 
 ## 9. Working on it
 
