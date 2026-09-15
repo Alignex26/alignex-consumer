@@ -154,6 +154,8 @@ for (const family of FAMILIES) {
     candidates.push(shape);
   }
 }
+// Shortest first, so a tie on coverage resolves toward the cheaper module.
+candidates.sort((a, b) => a.duration - b.duration || a.family.localeCompare(b.family));
 
 const score = (additions) => coverage(recipes, withAdded(current, additions), DURATIONS).ok;
 
@@ -190,6 +192,16 @@ if (!singleGains) {
 function smallestGainingBatch(from, maxSize = 4) {
   const base = score(from);
   for (let size = 1; size <= maxSize; size += 1) {
+    // SHORTEST SHAPE FIRST, at equal gain.
+    //
+    // The stack is LIFO, so pushing candidates in order explores the LAST one
+    // first — which recommended a 60s `settle` module where a 23s one achieves
+    // exactly the same coverage. That is worse twice over: a long module is
+    // harder to write well, and `finalise-master` derives a 30s ceiling for
+    // `settle` from its tightest slot and would have refused it outright.
+    //
+    // Exploring shortest-first means the first batch found at a given size is
+    // also the cheapest to produce.
     const stack = [[0, []]];
     while (stack.length > 0) {
       const [start, chosen] = stack.pop();
@@ -198,7 +210,8 @@ function smallestGainingBatch(from, maxSize = 4) {
         if (after > base) return { batch: chosen, before: base, after };
         continue;
       }
-      for (let i = start; i < candidates.length; i += 1) {
+      // Reversed, because the stack pops last-in first.
+      for (let i = candidates.length - 1; i >= start; i -= 1) {
         stack.push([i, [...chosen, candidates[i]]]);
       }
     }

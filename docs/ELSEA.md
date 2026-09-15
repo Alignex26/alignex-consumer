@@ -48,13 +48,13 @@ Last updated: 2026-09-09.
 | Lint | clean |
 | Migrations | 18 written, **all applied** |
 | Edge functions | all four deployed and current — marker `8126ffda` |
-| Modules | **17 playable**; +12 reaches 60/60, +16 is launch quality (§6y) |
-| Audio | **51 renditions, all approved** — 17 modules x warm, clear, bright, at 0.92x |
-| Recipes | **27 of 60** recipe/duration/voice combinations compose |
+| Modules | **18 playable**; +10 reaches 60/60 (§7a) |
+| Audio | **54 renditions, all approved** — 18 modules x warm, clear, bright, at 0.92x |
+| Recipes | **30 of 60** recipe/duration/voice combinations compose |
 | Voices | `warm` (default), `clear`, `bright` all selectable. 7 more catalogued, unmapped |
 | Languages | English content-ready. `es` `de` `fr` `pt-BR` planned, **no translated content** |
 | Commercial | entitlement schema live; **RevenueCat absent, no purchase possible** |
-| Blocking | 12 modules (§6y); **nothing heard on a device** |
+| Blocking | 10 modules (§7a); **nothing heard on a device** |
 
 **As of 2026-09-14 the product composes a real session.** Free text enters the
 safety gate, `nervous_ready` composes at all four durations from six approved
@@ -2637,6 +2637,61 @@ go, novelty is what makes the depth felt.
 
 `isRecentlySeen` remains uncalled. Retrying an identical composition is a
 different mechanism and was left for a later pass.
+
+## 7a. The first prediction that held — and two roadmap defects it caught
+
+2026-09-15. `settle_nothing_to_decide_short` authored, approved, generated in
+three voices, 3/3 mastered first pass. **27/60 to 30/60, exactly as forecast.**
+`wound_up_home` produced a session for the first time.
+
+That is the first coverage prediction in this project to match reality.
+
+### The roadmap was recommending modules the pipeline would refuse
+
+Step 1 said "`settle` module, 60s or shorter". `finalise-master` derives a **30s**
+ceiling for `settle` from its tightest accepting slot and would have rejected a
+60s master outright — after the script was written and the audio paid for.
+
+The planner now caps every candidate at the mastering ceiling. A plan that cannot
+be built is worse than no plan: it looks actionable.
+
+**A tension worth naming rather than routing around.** The conservative ceiling
+refuses a module that is genuinely usable in the roomier phases — it simply
+cannot fit the tightest one. Relaxing it would let a few long modules replace
+several short ones. That is a change to the mastering gate and has not been made.
+
+### The search preferred the longest shape at equal gain
+
+`settle` at 23s, 45s and 60s all give +3. The search returned 60s because its
+stack is LIFO and it explored the last candidate first. Longer modules are harder
+to write and, here, unbuildable.
+
+Candidates are now sorted shortest-first and the stack pushes in reverse, so the
+first batch found at a given size is also the cheapest to produce.
+
+### Constraining the plan made it smaller
+
+```
+12 modules   original roadmap, partly unbuildable
+14 modules   shortest-first, still unconstrained
+11 modules   capped at the mastering ceiling
+```
+
+Counter-intuitive and worth remembering: short modules chain better inside a
+phase, so `fillPhase` gets more use out of them. Respecting the pipeline's limits
+is not a tax here — it is cheaper.
+
+### State
+
+```
+modules      18 playable
+renditions   54, all approved, three voices at 0.92x
+composes     30/60
+remaining    10 modules to 60/60 (ground, prepare, focus)
+```
+
+`nervous_ready` and `wired_sleep` at every duration; `scattered_focused` and
+`wound_up_home` at 300s; `flat_go` at none.
 
 ## 7. Known gaps
 

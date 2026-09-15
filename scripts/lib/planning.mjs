@@ -167,12 +167,36 @@ export function durationShapesFor(family, recipes, existing) {
     ? observed[Math.floor(observed.length / 2)]
     : Math.max(8, Math.round(sorted[0] * 0.7));
 
+  // THE PIPELINE'S CEILING IS THE REAL LIMIT, and the planner must not
+  // recommend past it.
+  //
+  // `finalise-master` derives a module's duration ceiling as the SMALLEST floor
+  // of any phase accepting its family, so a module long enough to need a roomier
+  // phase is refused outright. Recommending one is worse than useless: it looks
+  // like a plan and cannot be built.
+  //
+  // This was found when the roadmap asked for a 60s `settle` module while the
+  // mastering ceiling for `settle` is 30s. A shorter one achieved identical
+  // coverage.
+  //
+  // There is a genuine tension here — a longer module IS usable in the roomier
+  // phases, and the conservative ceiling forbids it — but that is a question
+  // about `finalise-master`, not something to route around by recommending
+  // modules the pipeline will reject. Recorded rather than resolved.
+  const masteringCeiling = sorted[0];
+
   const shapes = new Map();
-  // Fits every accepting phase.
-  shapes.set(Math.min(sorted[0], typical), `<=${sorted[0]}s, fits every accepting phase`);
-  // One shape per additional floor, sized just inside it.
-  for (const floor of sorted.slice(1)) {
-    shapes.set(floor, `<=${floor}s, needs a phase with at least ${floor}s`);
+  shapes.set(Math.min(masteringCeiling, typical),
+    `<=${masteringCeiling}s, the mastering ceiling for this family`);
+
+  // Observed lengths below the ceiling are worth modelling too: they are what
+  // this content really measures, and shorter modules chain differently.
+  for (const d of observed) {
+    if (d < masteringCeiling) shapes.set(d, `${d}s, matching an existing module`);
   }
-  return [...shapes].map(([duration, note]) => ({ family, duration, note }));
+
+  return [...shapes]
+    .filter(([duration]) => duration <= masteringCeiling)
+    .map(([duration, note]) => ({ family, duration, note }))
+    .sort((a, b) => a.duration - b.duration);
 }

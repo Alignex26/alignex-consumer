@@ -1,0 +1,15 @@
+[
+  {
+    "module_key": "settle_nothing_to_decide_short",
+    "family": "settle",
+    "technique_key": "deferred_decision",
+    "storage_path": "modules/settle/settle_nothing_to_decide_short.m4a",
+    "duration_seconds": 23,
+    "requires_headphones": false,
+    "is_bed": false,
+    "version": 1,
+    "approved": false,
+    "script_text": "Nothing has to be worked out tonight. Not the thing you keep turning over, not tomorrow's order of play. Those are daylight problems, and they are better at being solved in daylight. If your mind goes to one, let it go there, and let it come back. There is nothing here that needs deciding.",
+    "content_approved": true
+  }
+]
